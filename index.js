@@ -6249,18 +6249,24 @@ replacement text
         }
     }
 
-    async function loadSessionFile(file_id) {
+async function loadSessionFile(file_id) {
         try {
             const res = await fetch(`/user/files/${file_id}`);
-            if (!res.ok) return null;
-            return await res.json();
+            if (res.status === 404) return null;
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const text = (await res.text()).trim();
+            if (!text) return null;
+            if (text.startsWith('<') || text.startsWith('<!DOCTYPE')) return null;
+            return JSON.parse(text);
         } catch (e) {
             console.error(`[${EXT_DISPLAY}] loadSessionFile error:`, e);
-            return null;
+            return false;
         }
     }
 
-    async function initChatBucket() {
+async function initChatBucket() {
+        clearTimeout(_commitTimer);
+        _commitTimer = null;
         const ctx = SillyTavern.getContext();
         if (!ctx.chatMetadata) ctx.chatMetadata = {};
         const { charId, chatId } = getBindingKey();
@@ -6293,8 +6299,13 @@ replacement text
             return;
         }
 
-        if (meta.file_id) {
+if (meta.file_id) {
             const payload = await loadSessionFile(meta.file_id);
+            if (payload === false) {
+                toastr.error('Failed to load Copilot session. Overwrites blocked to prevent data loss.', EXT_DISPLAY);
+                _inMemoryBucket = { activeSessionId: null, sessions: [], _readOnlyLock: true };
+                return;
+            }
             if (payload && payload.bucket) {
                 _inMemoryBucket = payload.bucket;
             } else {
@@ -6316,7 +6327,8 @@ replacement text
         }
     }
 
-    async function commitBucketChanges(force = false) {
+async function commitBucketChanges(force = false) {
+        if (_inMemoryBucket._readOnlyLock) return;
         _bucketDirty = true;
         
         const doCommit = async () => {
@@ -13417,36 +13429,31 @@ window.onerror=function(m){window.parent.postMessage({type:'scp-iframe-err',msg:
         window.addEventListener('resize', () => {
             if (windowEl && windowEl.style.display !== 'none') {
                 const r = windowEl.getBoundingClientRect();
-                let changed = false;
-                let newX = r.left, newY = r.top;
-                
-                if (r.right > window.innerWidth) { newX = Math.max(0, window.innerWidth - r.width); changed = true; }
-                if (r.bottom > window.innerHeight && r.top > 50) { newY = Math.max(0, window.innerHeight - r.height); changed = true; }
-                
-                if (changed) {
-                    windowEl.style.left = `${newX}px`; windowEl.style.top = `${newY}px`;
-                    const s = getSettings();
-                    s.windowX = newX; s.windowY = newY;
-                    saveSettings();
+                const s = getSettings();
+                if (s.windowX !== null && s.windowY !== null) {
+                    const maxLeft = Math.max(0, window.innerWidth - r.width);
+                    const maxTop = Math.max(0, window.innerHeight - r.height);
+                    windowEl.style.left = `${Math.max(0, Math.min(s.windowX, maxLeft))}px`;
+                    windowEl.style.top = `${Math.max(0, Math.min(s.windowY, maxTop))}px`;
                 }
             }
-            
             if (iconEl && iconEl.style.display !== 'none') {
-                const vw = window.visualViewport ? window.visualViewport.width : window.innerWidth;
-                const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+                const vw = window.innerWidth;
+                const vh = window.innerHeight;
                 const iconSize = 46;
-                let curLeft = parseFloat(iconEl.style.left);
-                let curTop = parseFloat(iconEl.style.top);
-                
-                if (!isNaN(curLeft) && !isNaN(curTop)) {
-                    let newLeft = Math.max(0, Math.min(curLeft, vw - iconSize));
-                    let newTop = Math.max(0, Math.min(curTop, vh - iconSize));
-                    
-                    if (newLeft !== curLeft || newTop !== curTop) {
-                        iconEl.style.left = `${newLeft}px`;
-                        iconEl.style.top = `${newTop}px`;
-                        localStorage.setItem(ICON_STORAGE_KEY, JSON.stringify({ left: `${newLeft}px`, top: `${newTop}px` }));
-                    }
+                const savedIconPos = localStorage.getItem(ICON_STORAGE_KEY);
+                if (savedIconPos) {
+                    try {
+                        const pos = JSON.parse(savedIconPos);
+                        const left = parseFloat(pos.left);
+                        const top = parseFloat(pos.top);
+                        if (!isNaN(left) && !isNaN(top)) {
+                            let newLeft = Math.max(0, Math.min(left, vw - iconSize));
+                            let newTop = Math.max(0, Math.min(top, vh - iconSize));
+                            iconEl.style.left = `${newLeft}px`;
+                            iconEl.style.top = `${newTop}px`;
+                        }
+                    } catch(e) {}
                 }
             }
         });
