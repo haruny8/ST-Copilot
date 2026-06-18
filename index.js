@@ -2883,16 +2883,48 @@ replacement text
                 const addTriggers = Array.isArray(change.triggers) ? change.triggers : [];
                 const autoConstant = (addTriggers.length === 0) && change.constant !== false;
                 data.entries[newUid] = {
-                    uid: newUid, key: addTriggers, keysecondary:[],
-                    content: change.content || '', comment: change.name || '',
-                    disable: false, group: '', selective: false,
-                    constant: change.constant === true || autoConstant,
-                    position: 0, depth: 4, displayIndex: newUid,
-                    prevent_recursion: false, delayUntilRecursion: false,
-                    scan_depth: null, match_whole_words: null, use_group_scoring: false,
-                    case_sensitive: null, automation_id: '', role: null,
-                    vectorized: false, sticky: null, cooldown: null, delay: null,
-                };
+    uid: newUid,
+    key: addTriggers,
+    keysecondary:[],
+    content: change.content || '',
+    comment: change.name || '',
+    disable: false,
+    group: '',
+    selective: false,
+    constant: change.constant === true || autoConstant,
+
+    position: 0,
+    depth: 4,
+    displayIndex: newUid,
+
+    order: change.order ?? 100,
+    probability: change.probability ?? 100,
+    groupWeight: change.groupWeight ?? 100,
+
+    useProbability: true,
+    addMemo: true,
+    groupOverride: false,
+
+    prevent_recursion: false,
+    delayUntilRecursion: false,
+
+    scan_depth: null,
+    match_whole_words: null,
+    use_group_scoring: false,
+    case_sensitive: null,
+
+    automation_id: '',
+    role: null,
+
+    vectorized: false,
+
+    sticky: 0,
+    cooldown: 0,
+    delay: 0,
+
+    excludeRecursion: false,
+    ignoreBudget: false,
+};
                 console.log(`[${EXT_DISPLAY}] applyLBChanges: ADD uid=${newUid} in "${bookName}" constant=${data.entries[newUid].constant}`);
                 bookCache[bookName] = data;
                 _wiCache[bookName] = data;
