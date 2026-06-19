@@ -731,9 +731,36 @@
 
 .scp-modal-body { flex: 1; overflow: auto; padding: 14px 16px; }
 .scp-ctx-pre {
-    font-family: var(--scp-font-mono); font-size: 11.5px; line-height: 1.65;
+    font-size: calc(13px - 2px); line-height: 1.55;
     color: var(--scp-text); white-space: pre-wrap; word-break: break-word; margin: 0;
+    font-family: var(--scp-font-mono);
 }
+.scp-ctx-inspector { display:flex; height:100%; width:100%; gap:0; overflow:hidden; }
+.scp-ctx-nav { width:160px; flex-shrink:0; height:100%; overflow-y:auto; border-right:1px solid rgba(255,255,255,0.06); padding:6px 4px; display:flex; flex-direction:column; gap:1px; }
+.scp-ctx-nav::-webkit-scrollbar { width: 4px; }
+.scp-ctx-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+.scp-ctx-nav-btn { all:unset; cursor:pointer; padding:4px 7px; border-radius:5px; font-size:10px; font-weight:600; color:var(--scp-text-muted); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:all 0.12s; box-sizing:border-box; width:100%; }
+.scp-ctx-nav-btn:hover { background:var(--scp-accent-bg); color:var(--scp-text); }
+.scp-ctx-nav-sub { font-weight:400; padding-left:14px; }
+.scp-ctx-nav-details { width:100%; margin-top:4px; }
+.scp-ctx-nav-details > summary { list-style:none; }
+.scp-ctx-nav-details > summary::-webkit-details-marker { display:none; }
+.scp-ctx-nav-system { color:var(--scp-accent) !important; }
+.scp-ctx-nav-user { color:#5bc0eb !important; }
+.scp-ctx-nav-assistant { color:var(--scp-success) !important; }
+.scp-ctx-nav-divider { height:1px; background:rgba(255,255,255,0.06); margin:4px 0; }
+.scp-ctx-body { flex:1; height:100%; overflow-y:auto; padding:10px 14px 20px; position:relative; scroll-behavior:smooth; }
+.scp-ctx-block { margin-bottom:16px; }
+.scp-ctx-block-header { font-size:10px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; padding:5px 10px; border-radius:6px 6px 0 0; }
+.scp-ctx-role-system { background:rgba(124,109,250,0.15); color:var(--scp-accent); }
+.scp-ctx-role-user { background:rgba(91,192,235,0.1); color:#5bc0eb; }
+.scp-ctx-role-assistant { background:rgba(76,175,125,0.1); color:var(--scp-success); }
+.scp-ctx-block-sep { height:1px; background:rgba(255,255,255,0.05); }
+.scp-ctx-block-body { background:rgba(0,0,0,0.18); border-radius:0 0 6px 6px; padding:10px 12px; border:1px solid rgba(255,255,255,0.04); border-top:none; }
+.scp-ctx-hl-tag { color:#71b7fb; }
+.scp-ctx-hl-macro { color:#ffd670; }
+.scp-ctx-hl-header { color:var(--scp-accent); font-weight:600; }
+.scp-ctx-anchor { display:block; position:relative; top:-8px; }
 .scp-modal-footer {
     padding: 8px 14px; border-top: var(--scp-border);
     background: var(--scp-toolbar-bg); display: flex; justify-content: flex-end;
