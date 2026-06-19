@@ -1150,7 +1150,7 @@ replacement text
             .replace('{{active_lorebooks}}', activeBooksStr)
             .replace('{{lorebook_output}}', LB_FORMAT_BLOCK);
             
-        return `<lorebook_management: module>\n${prompt}\n</lorebook_management: module>`;
+        return `<lorebook_management>\n${prompt}\n</lorebook_management>`;
     }
 
     // ─── Character Card Editing Engine ───────────────────────────────────────────
@@ -1333,7 +1333,7 @@ replacement text
             .replace('{{char_edit_fields}}', enabledFields)
             .replace('{{char_edit_format}}', CHAR_EDIT_FORMAT_BLOCK)
             .replace('{{char_create_format}}', CHAR_CREATE_FORMAT_BLOCK);
-        return `<character_management: module>\n${base}\n</character_management: module>`;
+        return `<character_management>\n${base}\n</character_management>`;
     }
 
     function buildChatEditAIInstructions(settings) {
@@ -1357,7 +1357,7 @@ replacement text
         const base = (settings.chatEditPrompt || DEFAULT_CHAT_EDIT_DIRECTIVE.trim())
             .replace('{{chat_edit_format}}', CHAT_EDIT_FORMAT_BLOCK)
             .replace('{{active_chat_ids}}', activeChatIds);
-        return `<chat_messages_editing: module>\n${base}\n</chat_message_editing: module>`;
+        return `<chat_messages_editing>\n${base}\n</chat_messages_editing>`;
     }
 
     function _sanitizeProposedTags(value) {
@@ -6800,6 +6800,236 @@ async function commitBucketChanges(force = false) {
         }).join('\n\n');
     }
 
+    // ─── Context Inspector (Raw Context Payload panel) ──────────────────────────
+
+    let _lastInspectorMessages = [];
+
+    // Sections this fork knows how to recognize & link to in the nav.
+    // Deliberately scoped to what this fork actually supports — no
+    // persistent_memory / tool_calls_system, since this fork doesn't have
+    // the Persistent Memory or Tool Calls features.
+    const _CTX_KNOWN_TAGS = new Set([
+        'character_information', 'lorebook_context', 'st_system_prompt',
+        'lorebook_management', 'character_management', 'chat_messages_editing',
+        'roleplay_context', 'entity_definitions', 'persona_configuration', 'operational_guidelines',
+    ]);
+
+    // This fork's user-persona tag isn't a fixed string — it's built
+    // dynamically as "<YourSTPersonaName_persona>". Instead of matching one
+    // exact tag, treat any tag ending in "_persona" as the persona section.
+    function _ctxIsKnownTag(tagName) {
+        return _CTX_KNOWN_TAGS.has(tagName) || /_persona$/.test(tagName);
+    }
+
+    // Stable id to anchor/link to regardless of the literal tag text, so
+    // "<John_persona>" and "<Jane_persona>" both resolve to the same anchor.
+    function _ctxSectionKey(tagName) {
+        if (/_persona$/.test(tagName)) return 'user_persona';
+        return tagName;
+    }
+
+    const _CTX_SECTION_LABELS = {
+        'lorebook_context': 'Lorebook',
+        'character_information': 'Character',
+        'user_persona': 'User Persona',
+        'lorebook_management': 'Lorebook Management',
+        'character_management': 'Character Management',
+        'chat_messages_editing': 'Chat Management',
+    };
+    // Sections shown under the collapsible "Modules" group rather than as a
+    // top-level nav entry.
+    const _CTX_MODULE_KEYS = new Set(['lorebook_management', 'character_management', 'chat_messages_editing']);
+
+    function _highlightContextText(raw) {
+        const events = [];
+        // NOTE: the code-block group intentionally does NOT fall back to end-of-
+        // string (no |$ alternative). If a ``` is never closed (e.g. the prompt
+        // mentions ``` inline like "use (```) for excerpts"), the |$ version
+        // would swallow everything after that point into one giant fake
+        // code-block, hiding all structural tags (<lorebook_context> etc.) from
+        // the tokenizer so their nav anchors are never inserted. Requiring a
+        // real closing ``` means unclosed fences simply don't match, and the
+        // tags that follow them are tokenized correctly.
+        const masterRe = /(```[\s\S]*?```)|(`[^`\n]*`)|(<\/?[^\s<>][^>]*>|<!--[\s\S]*?-->)|(\{\{[^}\n]+\}\})/gi;
+
+        let m;
+        masterRe.lastIndex = 0;
+while ((m = masterRe.exec(raw))!== null) {
+if (m[1]!== undefined) {
+// Only treat ``` as a real code fence if it starts on its own
+// line (preceded by \n or at position 0). An inline mention
+// like "(```)" in "Code blocks (```) for excerpts" would
+// otherwise pair up with the next ``` in the text, swallowing
+// every structural tag between them into a fake code block.
+if (m.index > 0 && raw[m.index - 1]!== '\n' && raw[m.index - 1]!== '\r') {
+// Back up the regex to just past this inline ``` so the
+// content after it is re-processed by subsequent iterations.
+masterRe.lastIndex = m.index + 3;
+continue;
+}
+events.push([m.index, masterRe.lastIndex, 'code_block', m[1]]);
+} else if (m[2]!== undefined) {
+events.push([m.index, masterRe.lastIndex, 'inline_code', m[2]]);
+} else if (m[3]!== undefined) {
+events.push([m.index, masterRe.lastIndex, 'tag', m[3]]);
+} else if (m[4]!== undefined) {
+events.push([m.index, masterRe.lastIndex, 'macro', m[4]]);
+}
+}
+
+        let html = '', last = 0;
+
+        // Find the LAST occurrence of each known opening tag. The actual
+        // structural sections (lorebook_context, character_information, the
+        // persona block, etc.) are always appended by this extension *after*
+        // the user's own system prompt text. If the user's prompt happens to
+        // mention a tag name in plain instructional text (e.g. "Lorebook
+        // entries inside <lorebook_context> tags"), that mention will always
+        // come *before* the real section. Anchoring to the last match instead
+        // of the first means the nav always lands on the real section,
+        // never on a passing mention of the tag name in the prompt's own
+        // instructions.
+const lastOpenIndex = new Map();
+for (const [start, end, type, match] of events) {
+if (type!== 'tag') continue;
+if (match.startsWith('</') || match.endsWith('/>') || match.startsWith('<!--')) continue;
+const openTag = match.match(/^<([^\s>]+)>$/);
+if (!openTag ||!_ctxIsKnownTag(openTag[1])) continue;
+// Structural filter: real sections (built by buildSystemContent) always
+// have a newline immediately after the closing >. Inline mentions in
+// prompt instructions have a space or text after. If no structural
+// match is found at all (edge case), fall back to last-occurrence so
+// the nav never silently produces zero anchors.
+const nextChar = raw[end]?? '';
+const key = _ctxSectionKey(openTag[1]);
+if (nextChar === '\n' || nextChar === '\r') {
+lastOpenIndex.set(key, start);
+} else if (!lastOpenIndex.has(key)) {
+// Fallback: if no structural match exists yet, record this
+// occurrence. A later structural match will overwrite it.
+lastOpenIndex.set(key, start);
+}
+}
+
+        let currentDepth = 0;
+
+        for (const [start, end, type, match] of events) {
+            if (start < last) continue;
+            html += escHtml(raw.slice(last, start));
+
+            if (type === 'tag') {
+                const isClose = match.startsWith('</');
+                const isSelfClose = match.endsWith('/>');
+                const isComment = match.startsWith('<!--');
+
+                let applyDepth;
+                if (isComment || isSelfClose) {
+                    applyDepth = currentDepth;
+                } else if (isClose) {
+                    currentDepth = Math.max(0, currentDepth - 1);
+                    applyDepth = currentDepth;
+                } else {
+                    applyDepth = currentDepth;
+                    currentDepth++;
+                }
+
+                const openTag = match.match(/^<([^\s>]+)>$/);
+                if (openTag && _ctxIsKnownTag(openTag[1])) {
+                    const key = _ctxSectionKey(openTag[1]);
+                    if (start === lastOpenIndex.get(key)) {
+                        html += `<span id="scp-ctx-sec-${escHtml(key)}" class="scp-ctx-anchor"></span>`;
+                    }
+                }
+
+                const depthClass = Math.min(applyDepth, 5);
+                html += `<span class="scp-ctx-hl-tag scp-ctx-hl-tag-d${depthClass}">${escHtml(match)}</span>`;
+            } else if (type === 'macro') {
+                html += `<span class="scp-ctx-hl-macro">${escHtml(match)}</span>`;
+            } else if (type === 'code_block' || type === 'inline_code') {
+                html += escHtml(match);
+            }
+            last = end;
+        }
+        html += escHtml(raw.slice(last));
+        return html;
+    }
+
+    function _buildContextInspectorHTML(messages) {
+        let navHtml = '', bodyHtml = '';
+        let seenSections = new Set();
+
+        messages.forEach((msg, idx) => {
+            let raw = Array.isArray(msg.content)
+                ? msg.content.map(p => p.type === 'text' ? p.text : '[Image]').join('\n')
+                : (msg.content || '');
+
+            let displayRole = msg.role;
+            if (msg.role !== 'system' && raw.includes('"type": "system_notification"')) {
+                displayRole = 'system';
+            }
+
+const LABELS = { system: '■ SYSTEM', user: '▶ USER', assistant: '◀ ASSISTANT' };
+let label = (LABELS[displayRole] || displayRole) + (idx > 0? ` #${idx}`: '');
+// If this is a user message that contains roleplay_context, label it properly
+if (displayRole === 'user' && raw.includes('<roleplay_context')) {
+const pickedMatch = raw.match(/picked_messages="(\d+)"/);
+const lastMatch = raw.match(/last_messages="(\d+)"/);
+const msgCount = pickedMatch? pickedMatch[1]: (lastMatch? lastMatch[1]: '');
+label = '▶ Roleplay Context' + (msgCount? ` (${msgCount} msgs)`: '') + (idx > 0? ` #${idx}`: '');
+}
+            const blockId = `scp-ctx-b${idx}`;
+
+            navHtml += `<button class="scp-ctx-nav-btn scp-ctx-nav-${displayRole}" data-t="${blockId}">${escHtml(label)}</button>`;
+
+            if (msg.role === 'system') {
+                // This fork doesn't wrap the system prompt itself in its own
+                // tag, so "System Prompt" just points at the top of the block.
+                navHtml += `<button class="scp-ctx-nav-btn scp-ctx-nav-sub" data-t="${blockId}">&nbsp;&nbsp;◦ System Prompt</button>`;
+
+                const tagRe = /<([^\s<>]+)>/g;
+                let tm;
+                tagRe.lastIndex = 0;
+                let moduleNavs = '';
+                while ((tm = tagRe.exec(raw)) !== null) {
+                    const rawTag = tm[1];
+                    if (!_ctxIsKnownTag(rawTag)) continue;
+                    const key = _ctxSectionKey(rawTag);
+                    const secLabel = _CTX_SECTION_LABELS[key];
+                    if (!secLabel || seenSections.has(key)) continue;
+                    seenSections.add(key);
+                    const secId = `scp-ctx-sec-${key}`;
+
+                    if (_CTX_MODULE_KEYS.has(key)) {
+                        moduleNavs += `<button class="scp-ctx-nav-btn scp-ctx-nav-sub" data-t="${secId}">&nbsp;&nbsp;◦ ${escHtml(secLabel)}</button>`;
+                    } else {
+                        navHtml += `<button class="scp-ctx-nav-btn scp-ctx-nav-sub" data-t="${secId}">&nbsp;&nbsp;◦ ${escHtml(secLabel)}</button>`;
+                    }
+                }
+                if (moduleNavs) {
+                    navHtml += `<details class="scp-ctx-nav-details" open><summary class="scp-ctx-nav-btn" style="color:var(--scp-text)">▼ Modules</summary>${moduleNavs}</details>`;
+                }
+            }
+
+            const highlighted = _highlightContextText(raw);
+            bodyHtml += `<div class="scp-ctx-block" id="${blockId}">`;
+            bodyHtml += `<div class="scp-ctx-block-header scp-ctx-role-${displayRole}">${escHtml(label)}</div>`;
+            bodyHtml += `<div class="scp-ctx-block-sep"></div>`;
+            bodyHtml += `<div class="scp-ctx-block-body"><pre class="scp-ctx-pre">${highlighted}</pre></div>`;
+            bodyHtml += `</div>`;
+        });
+
+        const styleHtml = `<style>
+            .scp-ctx-hl-tag-d0 { color: #eff6ff !important; }
+            .scp-ctx-hl-tag-d1 { color: #bfdbfe !important; }
+            .scp-ctx-hl-tag-d2 { color: #93c5fd !important; }
+            .scp-ctx-hl-tag-d3 { color: rgb(106, 165, 236) !important; }
+            .scp-ctx-hl-tag-d4 { color: rgb(100, 158, 253) !important; }
+            .scp-ctx-hl-tag-d5 { color: rgb(74, 120, 221) !important; }
+        </style>`;
+
+        return `<div class="scp-ctx-inspector">${styleHtml}<nav class="scp-ctx-nav">${navHtml}</nav><div class="scp-ctx-body" id="scp-ctx-body">${bodyHtml}</div></div>`;
+    }
+
     // ─── API Generation ─────────────────────────────────────────────────────────
 
     let _abortController = null;
@@ -10071,12 +10301,57 @@ window.onerror=function(m){window.parent.postMessage({type:'scp-iframe-err',msg:
         const inputEl = document.getElementById('scp-input');
         const pendingText = inputEl ? inputEl.value.trim() : '';
         const processedAtts = await _processAttachmentsBeforeSend(_pendingAttachments, true);
-        
+
         const messages = await assembleMessages(sess, settings, pendingText, processedAtts);
+        _lastInspectorMessages = messages;
+
         const fmtEl = $('scp-ctx-formatted'); const jsonEl = $('scp-ctx-json');
-        if (fmtEl) fmtEl.textContent = formatPayloadAsText(messages);
+
+        const modal = modalEl?.querySelector('.scp-modal');
+        if (modal) modal.style.height = '75vh';
+
+        const modalBody = modalEl?.querySelector('.scp-modal-body');
+        if (modalBody) {
+            modalBody.style.padding = '0';
+            modalBody.style.overflow = 'hidden';
+            modalBody.style.display = 'flex';
+            modalBody.style.flexDirection = 'column';
+            modalBody.style.height = '100%';
+        }
+
+        if (fmtEl) {
+            fmtEl.style.height = '100%';
+            fmtEl.style.flex = '1';
+            fmtEl.style.overflow = 'hidden';
+            fmtEl.style.padding = '0';
+            fmtEl.innerHTML = _buildContextInspectorHTML(messages);
+
+fmtEl.querySelectorAll('.scp-ctx-nav-btn[data-t]').forEach(btn => {
+btn.addEventListener('click', () => {
+const targetId = btn.dataset.t;
+const bodyContainer = document.getElementById('scp-ctx-body');
+if (!bodyContainer) return;
+const t = bodyContainer.querySelector('#' + CSS.escape(targetId));
+if (!t) { console.warn('[ST-Copilot] Nav target not found:', targetId); return; }
+const tRect = t.getBoundingClientRect();
+const cRect = bodyContainer.getBoundingClientRect();
+bodyContainer.scrollTo({ top: bodyContainer.scrollTop + tRect.top - cRect.top, behavior: 'smooth' });
+});
+});
+        }
         if (jsonEl) jsonEl.textContent = JSON.stringify(messages, null, 2);
         modalEl.style.display = 'flex';
+
+        setTimeout(() => {
+            const isJsonActive = document.querySelector('.scp-modal-tab.active')?.dataset.tab === 'json';
+            const targetEl = isJsonActive ? jsonEl : document.getElementById('scp-ctx-body');
+            if (targetEl) {
+                const prevBehavior = targetEl.style.scrollBehavior;
+                targetEl.style.scrollBehavior = 'auto';
+                targetEl.scrollTop = targetEl.scrollHeight;
+                targetEl.style.scrollBehavior = prevBehavior;
+            }
+        }, 0);
     }
 
     // ─── Drag & Resize ──────────────────────────────────────────────────────────
@@ -13654,15 +13929,32 @@ window.onerror=function(m){window.parent.postMessage({type:'scp-iframe-err',msg:
             tab.addEventListener('click', () => {
                 document.querySelectorAll('.scp-modal-tab').forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
-                $('scp-ctx-formatted').style.display = tab.dataset.tab === 'formatted' ? '' : 'none';
-                $('scp-ctx-json').style.display = tab.dataset.tab === 'json' ? '' : 'none';
+
+                const isFormatted = tab.dataset.tab === 'formatted';
+                const isJson = tab.dataset.tab === 'json';
+
+                const fmtEl = $('scp-ctx-formatted');
+                const jsonEl = $('scp-ctx-json');
+
+                if (fmtEl) fmtEl.style.display = isFormatted ? '' : 'none';
+                if (jsonEl) jsonEl.style.display = isJson ? '' : 'none';
+
+                setTimeout(() => {
+                    const targetEl = isJson ? jsonEl : document.getElementById('scp-ctx-body');
+                    if (targetEl) {
+                        const prevBehavior = targetEl.style.scrollBehavior;
+                        targetEl.style.scrollBehavior = 'auto';
+                        targetEl.scrollTop = targetEl.scrollHeight;
+                        targetEl.style.scrollBehavior = prevBehavior;
+                    }
+                }, 0);
             });
         });
         $('scp-ctx-copy-btn')?.addEventListener('click', () => {
             const activeTab = document.querySelector('.scp-modal-tab.active');
             const text = activeTab?.dataset.tab === 'json'
                 ? $('scp-ctx-json')?.textContent || ''
-                : $('scp-ctx-formatted')?.textContent || '';
+                : formatPayloadAsText(_lastInspectorMessages || []);
             copyText(text);
         });
     }
