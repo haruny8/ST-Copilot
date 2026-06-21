@@ -198,33 +198,47 @@ A Lorebook (or World Info) is a dynamic memory system used in roleplay to store 
 </context>
 
 <system_mechanics>
-After you generate a proposal, a background script extracts your \`lorebook-changes\` block for the user's UI. Once the user makes a decision, the system AUTOMATICALLY DELETES the code block from your message history to save context tokens. 
-If you look at the chat history and notice your previous \`lorebook-changes\` blocks are missing, understand that this is intentional system behavior. You successfully delivered them. Do NOT re-generate, repeat, or fix missing blocks from past messages.
+After you generate a proposal, a background script extracts your \`lorebook-changes\` block for the user's UI. Once the user makes a decision, the system AUTOMATICALLY DELETES the code block from your message history to save context tokens.
 </system_mechanics>
 
-<guidelines>
-1. Interaction Protocol: Propose updates ONLY upon explicit user command. Use suggestive language ("I propose...", NEVER "Saved/Applied"). Explain your reasoning (what/why) within your conversational response. Treat the code block as a detached appendix—NEVER narratively introduce it (e.g., omit "Here is the code block").
-2. Content Architecture (CRITICAL): Write consice, token-dense, objective, encyclopedic entries. 
-   - ANCHOR RULE: Every \`content\` string MUST start with the [Subject's Proper Name] followed by "is/was". 
-   - PROHIBITION: NEVER start with pronouns (He/She/It), articles (The/A), or introductory fluff.
-   - CHARACTER SPECS: Define height, build/morphology, facial features, hair/eyes, marks/scars, and typical attire.
-3. Anti-Cliché Nomenclature: Actively reject statistically overused LLM names (e.g., Elara, Kael, Lyra). Invent highly original, phonetically distinct names strictly grounded in the specific setting's culture.
-4. Triggers & Routing (CRITICAL): Optimize \`triggers\` using specific, unique nouns (no generic words). Route to active lorebooks (\`{{active_lorebooks}}\`) using absolute strict-string matching. If a required category is missing, generate a logically named NEW lorebook.
-5. MODIFICATION PROTOCOL (Patch vs. Edit):
-   - \`edit\`: Complete field overwrite. STRICTLY RESTRICTED to extremely short entries or 100% total rewrites. NEVER use \`edit\` for minor tweaks in a large block.
-   - \`patch\`: Your DEFAULT operation for modifying existing entries. 
-     * BOUNDARY ANCHOR SYNTAX (CRITICAL): You are STRICTLY FORBIDDEN from writing the full text in the \`anchor\` key. You MUST extract exactly 3-4 words from the START of the target text, add " || ", then 3-4 words from the END.
+<content_standards>
+- Style: Token-dense, encyclopedic, objective.
+- Anchor Rule: Content MUST start with "[Subject Name] is/was". No pronouns/articles at the start.
+- Anti-Cliché: R Actively reject statistically overused LLM names (e.g., Elara, Kael, Lyra). Invent highly original, phonetically distinct names strictly grounded in the specific setting's culture.
+</content_standards>
+
+<outlet_entries_info>
+Outlet entries (position=5) are reusable content blocks injected wherever {{outlet::outlet_name}} macro appears in other prompts or scenarios. They are NOT directly added to context.
+To create an outlet entry: use "add" action with "outlet":true and "outlet_name":"your_outlet_name".
+To convert an existing entry to outlet: use "edit" with "outlet":true and "outlet_name":"your_outlet_name".
+Active outlet entries are listed in lorebook_context under "Outlet Entries" (if exists).
+</outlet_entries_info>
+
+<modification_protocol>
+- \`add\` / \`delete\`: entry from lorebook.
+- \`prepend\` / \`append\`: Insert text EXACTLY BEFORE or AFTER existing entry content.
+- \`edit\`: Total rewrite (<300 words entries only).
+- \`patch\`: Default for entries. 
+   - Triggers: Use specific nouns.
+   - Boundary Syntax: "First 3 words || Last 3 words" (string-string match). 
      * BAD: "The ancient castle was built in 1240 by a grumpy dwarf."
      * GOOD: "The ancient castle || grumpy dwarf."
-</guidelines>
+</modification_protocol>
 
-<output_formatting>
-When proposing changes, generate a markdown code block tagged exactly as \`lorebook-changes\`.
-This block MUST be placed at the very end of your message, after all conversational text.
+<output_requirement>
+MANDATORY: When proposing changes, you MUST follow these rules EXACTLY:
+1. Generate a markdown code block tagged EXACTLY as \`lorebook-changes\` (no extra spaces, no other tags).
+2. Inside the code block, you MUST follow the JSON structure shown below — copy it character for character.
+3. The code block MUST be the VERY LAST thing in your message. Nothing comes after it — no text, no explanations, no closing remarks.
+4. Do not add any extra fields beyond what the structure shows.
 
-Format requirement (Strictly adhere to this JSON structure):
+Active lorebooks (use sctrict-strict match): {{active_lorebooks}}
+
+**FORMAT REQUIREMENT** (STRICTLY adhere to this JSON structure — replace placeholder values only, keep brackets and commas exactly as shown):
 {{lorebook_output}}
-</output_formatting>`;
+
+FAILURE TO FOLLOW THESE RULES WILL CAUSE THE LOREBOOK PARSER TO REJECT YOUR CHANGES.
+</output_requirement>`;
 
     const DEFAULT_CHAR_EDIT_DIRECTIVE = `<context>
 SillyTavern utilizes V2/V3 Character Cards—complex JSON structures that define an entity's cognitive profile, physical attributes, and behavioral heuristics. These cards use specific fields (\`description\`, \`personality\`, \`scenario\`, \`first_mes\`, \`mes_example\`) and dynamic macros (\`{{char}}\`, \`{{user}}\`) to ensure seamless persona-to-user interaction and cross-model portability. You are proposed to manipulate these data structures with surgical precision.
@@ -345,6 +359,7 @@ Currently visible messages: {{active_chat_ids}}
     const LB_FORMAT_BLOCK = `\`\`\`lorebook-changes
 {"changes":[
   {"action":"add","worldName":"BookName","name":"EntryName","triggers":["keyword"],"content":"Entry content","constant":false},
+  {"action":"add","worldName":"BookName","name":"OutletEntry","content":"Outlet content here","outlet":true,"outlet_name":"my_outlet_name"},
   {"action":"edit","worldName":"BookName","uid":123,"name":"NewName","triggers":null (for original keywords) | ["newKw"],"content":"New content","constant":false},
   {"action":"patch","worldName":"BookName","uid":123,"triggers":null (for original keywords) | ["newKw"],"patches":[{"anchor":"first || last","replace":"replacement"}]},
   {"action":"delete","worldName":"BookName","uid":123,"name":"EntryName"}
@@ -834,6 +849,9 @@ replacement text
                 selective: !!e.selective,
                 position: e.position ?? 0,
                 displayIndex: uid,
+                outletName: e.extensions?.outlet_name || e.outletName || e.outlet_name || (typeof e.outlet === 'string' ? e.outlet : '') || '',
+                outlet: e.outlet_name || e.outletName || (typeof e.outlet === 'string' ? e.outlet : '') || '',
+                group: e.group || '',
             };
         });
         return data;
@@ -1112,20 +1130,36 @@ replacement text
         if (!Object.keys(toInject).length) return '';
 
         let block = '\n\n<lorebook_context>\n';
-        for (const[bookName, entries] of Object.entries(toInject)) {
-            block += `## ${getDisplayName(bookName)}\n`;
-            for (const e of entries) {
-                block += `### ${e.comment || `Entry #${e.uid}`} (uid: ${e.uid})`;
-                if (e.key?.length) block += ` [keys: ${e.key.slice(0, 5).join(', ')}]`;
-                block += `\n${e.content}\n\n`;
-                _lastActiveEntries.push({
-                    bookName,
-                    displayName: getDisplayName(bookName),
-                    entryName: e.comment || `#${e.uid}`,
-                    uid: e.uid,
-                });
-            }
-        }
+let outletLines = [];
+for (const [bookName, entries] of Object.entries(toInject)) {
+let hasNormalEntries = false;
+let bookBlock = `## ${getDisplayName(bookName)}\n`;
+for (const e of entries) {
+const outletId = (e.outlet_name || e.outletName || e.automation_id || e.automationId || (typeof e.outlet === 'string' ? e.outlet : '') || '').trim();
+const isPositionOutlet = '7' === String(e.position) || 'outlet' === String(e.position).toLowerCase();
+const outletLabel = outletId || (isPositionOutlet? (e.group || '').trim(): '');
+
+if (isPositionOutlet || outletLabel !== '') {
+    if (!e.disable) {
+        // Include the actual content in the lorebook context
+        hasNormalEntries = true;
+        bookBlock += `### ${e.comment || `Entry #${e.uid}`} (uid: ${e.uid}) [OUTLET: ${outletLabel}]`;
+        if (e.key?.length) bookBlock += ` [keys: ${e.key.slice(0, 5).join(', ')}]`;
+        bookBlock += `\n${e.content}\n\n`;
+        _lastActiveEntries.push({ bookName, displayName: getDisplayName(bookName), entryName: e.comment || `#${e.uid}`, uid: e.uid });
+    }
+    continue;
+}hasNormalEntries = true;
+bookBlock += `### ${e.comment || `Entry #${e.uid}`} (uid: ${e.uid})`;
+if (e.key?.length) bookBlock += ` [keys: ${e.key.slice(0, 5).join(', ')}]`;
+bookBlock += `\n${e.content}\n\n`;
+_lastActiveEntries.push({ bookName, displayName: getDisplayName(bookName), entryName: e.comment || `#${e.uid}`, uid: e.uid });
+}
+if (hasNormalEntries) block += bookBlock;
+}
+if (outletLines.length) {
+block += `## Outlet Entries (injected via {{outlet::name}} macro, not directly)\n${outletLines.join('\n')}\n\n`;
+}
         block += '</lorebook_context>';
         return block;
     }
@@ -1152,6 +1186,43 @@ replacement text
             
         return `<lorebook_management>\n${prompt}\n</lorebook_management>`;
     }
+
+async function expandOutletsAsync(text, depth = 0) {
+if (!text || typeof text!== 'string' ||!text.includes('{{outlet::') || depth > 3) return text;
+const outletNames = [...new Set([...text.matchAll(/\{\{outlet::(.*?)\}\}/gi)].map(m => m[1]))];
+if (!outletNames.length) return text;
+const activeBooks = getActiveLorebookNames();
+if (!activeBooks.includes(EMBEDDED_BOOK_KEY)) activeBooks.push(EMBEDDED_BOOK_KEY);
+const allBookData = [];
+for (const bookName of activeBooks) {
+const data = await fetchWorldInfoBook(bookName);
+if (data) allBookData.push(data);
+}
+let result = text;
+for (const name of outletNames) {
+const trimmedName = name.trim();
+const matchedEntries = [];
+for (const bookData of allBookData) {
+const entries = Object.values(bookData.entries || {});
+for (const entry of entries) {
+const entryOutlet = (entry.outlet_name || entry.outletName || entry.automation_id || entry.automationId || (typeof entry.outlet === 'string' ? entry.outlet : '') || '').trim();
+const isPositionOutlet = '7' === String(entry.position) || 'outlet' === String(entry.position).toLowerCase();
+const label = entryOutlet || (isPositionOutlet? (entry.group || '').trim(): '');
+if (!entry.disable && label === trimmedName) {
+matchedEntries.push(entry);
+}
+}
+}
+const replacement = matchedEntries.map(e => expandMacros(e.content || '')).join('\n');
+const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const regex = new RegExp(`\\{\\{outlet::${escapedName}\\}\\}`, 'g');
+result = result.replace(regex, replacement);
+}
+if (result.includes('{{outlet::')) {
+result = await expandOutletsAsync(result, depth + 1);
+}
+return result;
+}
 
     // ─── Character Card Editing Engine ───────────────────────────────────────────
 
@@ -2877,59 +2948,62 @@ replacement text
                 continue;
             }
 
-            if (change.action === 'add') {
-                const uids = Object.keys(data.entries).map(Number);
-                const newUid = uids.length ? Math.max(...uids) + 1 : 1;
-                const addTriggers = Array.isArray(change.triggers) ? change.triggers : [];
-                const autoConstant = (addTriggers.length === 0) && change.constant !== false;
-                data.entries[newUid] = {
-    uid: newUid,
-    key: addTriggers,
-    keysecondary:[],
-    content: change.content || '',
-    comment: change.name || '',
-    disable: false,
-    group: '',
-    selective: false,
-    constant: change.constant === true || autoConstant,
-
-    position: 0,
-    depth: 4,
-    displayIndex: newUid,
-
-    order: change.order ?? 100,
-    probability: change.probability ?? 100,
-    groupWeight: change.groupWeight ?? 100,
-
-    useProbability: true,
-    addMemo: true,
-    groupOverride: false,
-
-    prevent_recursion: false,
-    delayUntilRecursion: false,
-
-    scan_depth: null,
-    match_whole_words: null,
-    use_group_scoring: false,
-    case_sensitive: null,
-
-    automation_id: '',
-    role: null,
-
-    vectorized: false,
-
-    sticky: 0,
-    cooldown: 0,
-    delay: 0,
-
-    excludeRecursion: false,
-    ignoreBudget: false,
-};
-                console.log(`[${EXT_DISPLAY}] applyLBChanges: ADD uid=${newUid} in "${bookName}" constant=${data.entries[newUid].constant}`);
-                bookCache[bookName] = data;
-                _wiCache[bookName] = data;
-                successfulChanges.push(change);
-            } else if (change.action === 'edit') {
+if (change.action === 'add') {
+    const uids = Object.keys(data.entries).map(Number);
+    const newUid = uids.length ? Math.max(...uids) + 1 : 1;
+    const isOutlet = !!(change.outlet || change.outlet_name);
+    const outletName = (change.outlet_name || '').trim();
+    
+    // FIXED: Only clear triggers if it's an outlet AND no triggers were explicitly provided
+    const addTriggers = isOutlet 
+        ? (Array.isArray(change.triggers) && change.triggers.length > 0 ? change.triggers : [])
+        : (Array.isArray(change.triggers) ? change.triggers : []);
+    
+    const autoConstant = !isOutlet && addTriggers.length === 0 && change.constant !== false;
+    
+    data.entries[newUid] = {
+        uid: newUid,
+        key: addTriggers,  // FIXED: Now preserves triggers even for outlets
+        keysecondary: [],
+        content: change.content || '',
+        comment: change.name || '',
+        disable: false,
+        group: change.group || '',  // FIXED: Don't auto-set group to outlet name
+        selective: false,
+        constant: !isOutlet && (change.constant === true || autoConstant),
+        position: isOutlet ? 7 : (change.position ?? 0),
+        depth: 4,
+        displayIndex: newUid,
+        automation_id: outletName,  // This is the correct field for outlet name
+        outletName: outletName,     // Backup field
+        outlet: isOutlet,  // Boolean flag only — the NAME lives in automation_id/outletName, never here
+        
+        order: change.order ?? 100,
+        probability: change.probability ?? 100,
+        groupWeight: change.groupWeight ?? 100,
+        useProbability: true,
+        addMemo: true,
+        groupOverride: false,
+        prevent_recursion: false,
+        delayUntilRecursion: false,
+        scan_depth: null,
+        match_whole_words: null,
+        use_group_scoring: false,
+        case_sensitive: null,
+        role: null,
+        vectorized: false,
+        sticky: 0,
+        cooldown: 0,
+        delay: 0,
+        excludeRecursion: false,
+        ignoreBudget: false,
+    };
+    
+    console.log(`[${EXT_DISPLAY}] applyLBChanges: ADD uid=${newUid} in "${bookName}" constant=${data.entries[newUid].constant} outlet=${isOutlet} triggers=${addTriggers.length}`);
+    bookCache[bookName] = data;
+    _wiCache[bookName] = data;
+    successfulChanges.push(change);
+} else if (change.action === 'edit') {
                 if (!origEntry) {
                     const msg = `Entry not found for edit: "${change.name || change.uid || '?'}" in "${bookName}"`;
                     toastr.error(`[LB] ${msg}`, EXT_DISPLAY, { timeOut: 10000 });
@@ -2945,6 +3019,26 @@ replacement text
                 }
                 if (change.content !== undefined) origEntry.content = change.content;
                 if (change.constant !== undefined) origEntry.constant = !!change.constant;
+if (change.outlet!== undefined || change.outlet_name!== undefined) {
+const eOutletName = (change.outlet_name || '').trim();
+if (change.outlet || eOutletName) {
+origEntry.position = 7;
+origEntry.automation_id = eOutletName;
+origEntry.outletName = eOutletName;
+origEntry.outlet = true;  // Boolean flag only — name lives in automation_id/outletName above
+origEntry.group = eOutletName;
+origEntry.constant = false;
+if (origEntry.extensions) origEntry.extensions.outlet_name = eOutletName;
+else origEntry.extensions = { outlet_name: eOutletName };
+} else {
+origEntry.position = change.position?? 0;
+origEntry.automation_id = '';
+origEntry.outletName = '';
+origEntry.outlet = false;
+origEntry.group = '';
+if (origEntry.extensions) origEntry.extensions.outlet_name = '';
+}
+}
                 console.log(`[${EXT_DISPLAY}] applyLBChanges: EDIT uid=${origEntry.uid} in "${bookName}"`);
                 bookCache[bookName] = data;
                 _wiCache[bookName] = data;
@@ -4296,7 +4390,7 @@ replacement text
         const getAppliedCount = () => itemStates.filter(s => s === 'applied').length;
 
         const checkAllResolved = () => {
-            if (getPendingCount() === 0) card.remove();
+            if (getPendingCount() === 0) { syncBlockToMessage(); card.remove(); }
         };
 
         // ── Header ──
@@ -4321,6 +4415,7 @@ replacement text
             if (dismissedChanges.length > 0) {
                 logLBHistoryChanges(dismissedChanges, 'Dismissed', card.dataset.for);
             }
+            itemStates.forEach((s, i) => { if (s === 'pending') itemStates[i] = 'dismissed'; });
             syncBlockToMessage(); card.remove();
         });
 
@@ -4746,6 +4841,28 @@ replacement text
                 constWrap.appendChild(constCb);
                 constWrap.appendChild(Object.assign(document.createElement('span'), { textContent: 'Constant (always inject)' }));
                 editPanel.appendChild(constWrap);
+
+                // Outlet checkbox
+                const outletWrap = document.createElement('label');
+                outletWrap.className = 'scp-sp-check'; outletWrap.style.marginTop = '6px';
+                const outletCb = document.createElement('input');
+                outletCb.type = 'checkbox'; outletCb.checked = !!c.outlet;
+                outletWrap.appendChild(outletCb);
+                outletWrap.appendChild(Object.assign(document.createElement('span'), { textContent: 'Outlet Entry' }));
+                const outletNameRow = document.createElement('div');
+                outletNameRow.className = 'scp-lb-pe-row'; outletNameRow.style.display = c.outlet ? 'flex' : 'none';
+                const outletNameInp = document.createElement('input');
+                outletNameInp.type = 'text'; outletNameInp.className = 'scp-lb-pe-input';
+                outletNameInp.value = c.outlet_name || ''; outletNameInp.placeholder = 'Outlet macro name...';
+                outletNameInp.addEventListener('input', () => { editableChanges[ci].outlet_name = outletNameInp.value; });
+                outletNameRow.innerHTML = '<label class="scp-lb-pe-label">Outlet Name</label>';
+                outletNameRow.appendChild(outletNameInp);
+                outletCb.addEventListener('change', () => {
+                    editableChanges[ci].outlet = outletCb.checked;
+                    outletNameRow.style.display = outletCb.checked ? 'flex' : 'none';
+                });
+                editPanel.appendChild(outletWrap);
+                editPanel.appendChild(outletNameRow);
 
                 item.appendChild(editPanel);
 
@@ -6229,10 +6346,10 @@ replacement text
     // ─── Storage Subsystem ─────────────────────────────
 
     let _inMemoryBucket = { activeSessionId: null, sessions: [] };
-    let _bucketDirty = false;
-    let _commitTimer = null;
+    let _currentSessionFileId = null;
+    const _saveQueue = new Map();
 
-    async function saveSessionFile(file_id, payload) {
+    async function saveSessionFile(file_id, payload, useKeepalive = false) {
         const ctx = SillyTavern.getContext();
         try {
             const jsonStr = JSON.stringify(payload);
@@ -6240,127 +6357,193 @@ replacement text
             const res = await fetch('/api/files/upload', {
                 method: 'POST',
                 headers: { ...ctx.getRequestHeaders(), 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: file_id, data: b64 })
+                body: JSON.stringify({ name: file_id, data: b64 }),
+                keepalive: useKeepalive
             });
             return res.ok;
         } catch (e) {
+            _dbgAdd('STORAGE_WRITE_FAILED', { file_id, error: e.message });
             console.error(`[${EXT_DISPLAY}] saveSessionFile error:`, e);
             return false;
         }
     }
 
-async function loadSessionFile(file_id) {
+    window.addEventListener('beforeunload', () => {
+        for (const [fileId, item] of _saveQueue.entries()) {
+            clearTimeout(item.timer);
+            saveSessionFile(fileId, item.payload, true);
+        }
+    });
+
+    function _decodeBase64Utf8(b64) {
+        return decodeURIComponent(escape(atob(b64)));
+    }
+
+    function _tryParseSessionPayload(text) {
+        try { return JSON.parse(text); } catch (_) {}
+        try { return JSON.parse(_decodeBase64Utf8(text)); } catch (_) {}
+        try { return JSON.parse(_repairJSON(text)); } catch (_) {}
+        try { return JSON.parse(_repairJSON(_decodeBase64Utf8(text))); } catch (_) {}
+        return undefined;
+    }
+
+    async function loadSessionFile(file_id) {
         try {
             const res = await fetch(`/user/files/${file_id}`);
             if (res.status === 404) return null;
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const text = (await res.text()).trim();
-            if (!text) return null;
-            if (text.startsWith('<') || text.startsWith('<!DOCTYPE')) return null;
-            return JSON.parse(text);
+
+            const text = await res.text();
+            const trimmed = text.trim();
+            if (!trimmed) return null;
+
+            if (trimmed.startsWith('<') || trimmed.startsWith('<!DOCTYPE')) {
+                _dbgAdd('STORAGE_LOAD_HTML_REDIRECT', { file_id });
+                return null;
+            }
+
+            const parsed = _tryParseSessionPayload(trimmed);
+            if (parsed === undefined) throw new Error('Unrecoverable payload after base64/repair fallback');
+            return parsed;
         } catch (e) {
+            _dbgAdd('STORAGE_LOAD_ERROR', { file_id, error: e.message });
             console.error(`[${EXT_DISPLAY}] loadSessionFile error:`, e);
-            return false;
+            return false; 
         }
     }
 
-async function initChatBucket() {
-        clearTimeout(_commitTimer);
-        _commitTimer = null;
+    async function initChatBucket({ forceReset = false } = {}) {
         const ctx = SillyTavern.getContext();
         if (!ctx.chatMetadata) ctx.chatMetadata = {};
         const { charId, chatId } = getBindingKey();
-        const s = getSettings();
-        
-        let meta = ctx.chatMetadata.st_copilot;
-        const safeChatId = chatId.replace(/[^a-zA-Z0-9_-]/g, '_');
-        
-        let v0Data = null;
-        if (s.sessions && s.sessions[charId]) {
-            if (s.sessions[charId][chatId] && s.sessions[charId][chatId].sessions?.length > 0) {
-                v0Data = { ...s.sessions[charId][chatId] };
-                delete s.sessions[charId][chatId];
-            } else if (s.sessions[charId]['unified'] && s.sessions[charId]['unified'].sessions?.length > 0) {
-                v0Data = { ...s.sessions[charId]['unified'] };
-                delete s.sessions[charId]['unified'];
-            }
-            if (v0Data) saveSettings();
-        }
 
-        if (!meta && v0Data) {
-            meta = { activeSessionId: v0Data.activeSessionId, sessions: v0Data.sessions };
-        }
-
-        if (!meta) {
-            _inMemoryBucket = { activeSessionId: null, sessions: [] };
-            ctx.chatMetadata.st_copilot = { file_id: `copilot_sess_${safeChatId}_${Date.now()}.json` };
+        if (forceReset) {
+            const prevMeta = ctx.chatMetadata.st_copilot || null;
+            const freshId = `copilot_sess_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.json`;
+            ctx.chatMetadata.st_copilot = { format: 'v4', file_id: freshId, chat_id: chatId };
             if (typeof ctx.saveMetadata === 'function') ctx.saveMetadata();
+            _currentSessionFileId = freshId;
+            _inMemoryBucket = { activeSessionId: null, sessions: [] };
             await commitBucketChanges(true);
+            _dbgAdd('SESSION_FORCE_RESET', { charId, chatId, prevFileId: prevMeta?.file_id || null, newFileId: freshId });
             return;
         }
 
-if (meta.file_id) {
-            const payload = await loadSessionFile(meta.file_id);
-            if (payload === false) {
-                toastr.error('Failed to load Copilot session. Overwrites blocked to prevent data loss.', EXT_DISPLAY);
-                _inMemoryBucket = { activeSessionId: null, sessions: [], _readOnlyLock: true };
-                return;
-            }
-            if (payload && payload.bucket) {
-                _inMemoryBucket = payload.bucket;
+        for (const [fileId, item] of _saveQueue.entries()) {
+            clearTimeout(item.timer);
+            _saveQueue.delete(fileId);
+            saveSessionFile(fileId, item.payload);
+        }
+
+        let meta = ctx.chatMetadata.st_copilot;
+        let targetFileId = null;
+        let payload = null;
+
+        if (meta && meta.file_id && meta.format === 'v4') {
+            if (meta.chat_id === chatId) {
+                targetFileId = meta.file_id;
+                payload = await loadSessionFile(targetFileId);
             } else {
-                _inMemoryBucket = { activeSessionId: null, sessions: [] };
-                await commitBucketChanges(true);
+                _dbgAdd('STORAGE_CHAT_BRANCH_DETECTED', { oldChatId: meta.chat_id, newChatId: chatId });
+                payload = await loadSessionFile(meta.file_id);
+                targetFileId = `copilot_sess_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.json`;
+                
+                if (payload && payload !== false) {
+                    await saveSessionFile(targetFileId, payload);
+                }
+                
+                ctx.chatMetadata.st_copilot = { format: 'v4', file_id: targetFileId, chat_id: chatId };
+                if (typeof ctx.saveMetadata === 'function') ctx.saveMetadata();
             }
-        } else if (meta.sessions) { 
-            _inMemoryBucket = { activeSessionId: meta.activeSessionId, sessions: meta.sessions };
-            ctx.chatMetadata.st_copilot = { file_id: `copilot_sess_${safeChatId}_${Date.now()}.json` };
-            delete meta.sessions;
-            delete meta.activeSessionId; 
+        } else {
+            targetFileId = `copilot_sess_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.json`;
+            _dbgAdd('STORAGE_MIGRATION_V4_INIT', { targetFileId });
+            
+            const safeChatId = chatId.replace(/[^a-zA-Z0-9_-]/g, '_');
+            payload = await loadSessionFile(`copilot_sess_${safeChatId}.json`);
+
+            if (!payload && meta && meta.file_id && meta.format !== 'v4') {
+                payload = await loadSessionFile(meta.file_id);
+            }
+
+            if (!payload) {
+                const s = getSettings();
+                if (s.sessions && s.sessions[charId]) {
+                    if (s.sessions[charId][chatId] && s.sessions[charId][chatId].sessions?.length > 0) {
+                        payload = { bucket: { ...s.sessions[charId][chatId] } };
+                        delete s.sessions[charId][chatId]; saveSettings();
+                    } else if (s.sessions[charId]['unified'] && s.sessions[charId]['unified'].sessions?.length > 0) {
+                        payload = { bucket: { ...s.sessions[charId]['unified'] } };
+                        delete s.sessions[charId]['unified']; saveSettings();
+                    }
+                }
+            }
+
+            ctx.chatMetadata.st_copilot = { format: 'v4', file_id: targetFileId, chat_id: chatId };
             if (typeof ctx.saveMetadata === 'function') ctx.saveMetadata();
+        }
+
+        _currentSessionFileId = targetFileId;
+
+        if (payload === false) {
+            _dbgAdd('STORAGE_LOAD_CORRUPTED_RECOVERY', { brokenFileId: targetFileId, charId, chatId });
+            const recoveryFileId = `copilot_sess_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.json`;
+            ctx.chatMetadata.st_copilot = { format: 'v4', file_id: recoveryFileId, chat_id: chatId, recoveredFrom: targetFileId };
+            if (typeof ctx.saveMetadata === 'function') ctx.saveMetadata();
+
+            targetFileId = recoveryFileId;
+            _inMemoryBucket = { activeSessionId: null, sessions: [] };
+            _currentSessionFileId = targetFileId;
             await commitBucketChanges(true);
+
+            toastr.error('Copilot session file was corrupted and could not be recovered. Started a fresh session storage for this chat; the broken file was kept on disk for manual recovery.', EXT_DISPLAY, { timeOut: 15000 });
+            return;
+        }
+
+        if (payload && payload.bucket) {
+            _inMemoryBucket = payload.bucket;
+            _dbgAdd('STORAGE_BUCKET_LOADED', { charId, chatId, fileId: targetFileId, sessionCount: _inMemoryBucket.sessions?.length || 0 });
         } else {
             _inMemoryBucket = { activeSessionId: null, sessions: [] };
-            ctx.chatMetadata.st_copilot = { file_id: `copilot_sess_${safeChatId}_${Date.now()}.json` };
-            if (typeof ctx.saveMetadata === 'function') ctx.saveMetadata();
+            _dbgAdd('STORAGE_BUCKET_EMPTY_INIT', { charId, chatId, fileId: targetFileId, hadPayload: !!payload });
+        }
+        
+        if (!payload || meta?.format !== 'v4') {
             await commitBucketChanges(true);
         }
     }
 
-async function commitBucketChanges(force = false) {
-        if (_inMemoryBucket._readOnlyLock) return;
-        _bucketDirty = true;
+    async function commitBucketChanges(force = false) {
+        const fileName = _currentSessionFileId;
+        if (!fileName) return;
+
+        const { chatId } = getBindingKey();
+        const snapshot = JSON.parse(JSON.stringify(_inMemoryBucket));
         
-        const doCommit = async () => {
-            if (!_bucketDirty) return;
-            const ctx = SillyTavern.getContext();
-            const { chatId } = getBindingKey();
-            let file_id = ctx.chatMetadata?.st_copilot?.file_id;
-            
-            if (!file_id) {
-                const safeChatId = chatId.replace(/[^a-zA-Z0-9_-]/g, '_');
-                file_id = `copilot_sess_${safeChatId}_${Date.now()}.json`;
-                if (!ctx.chatMetadata) ctx.chatMetadata = {};
-                ctx.chatMetadata.st_copilot = { file_id };
-                if (typeof ctx.saveMetadata === 'function') ctx.saveMetadata();
-            }
-            
-            const payload = {
-                _version: 2,
-                chat_id_reference: chatId,
-                updated_at: Date.now(),
-                bucket: _inMemoryBucket
-            };
-            
-            const success = await saveSessionFile(file_id, payload);
-            if (success) _bucketDirty = false;
+        const payloadToSave = {
+            _version: 4,
+            chat_id_reference: chatId,
+            updated_at: Date.now(),
+            bucket: snapshot
         };
 
         if (force) {
-            await doCommit();
+            const existing = _saveQueue.get(fileName);
+            if (existing) clearTimeout(existing.timer);
+            _saveQueue.delete(fileName);
+            
+            const success = await saveSessionFile(fileName, payloadToSave);
+            if (!success) _dbgAdd('STORAGE_WRITE_FAILED', { fileName });
         } else {
-            clearTimeout(_commitTimer);
-            _commitTimer = setTimeout(doCommit, 1000);
+            const existing = _saveQueue.get(fileName);
+            if (existing) clearTimeout(existing.timer);
+
+            const timer = setTimeout(() => {
+                _saveQueue.delete(fileName);
+                saveSessionFile(fileName, payloadToSave);
+            }, 1000);
+
+            _saveQueue.set(fileName, { timer, payload: payloadToSave });
         }
     }
 
@@ -6721,24 +6904,27 @@ async function commitBucketChanges(force = false) {
 
     function _buildAiContextForHistoryMsg(msg) {
         try {
-            const lines = msg.appliedLines || [];
+            const lines = msg.swipes?.[msg.swipeIndex || 0]?.historyLines || msg.appliedLines || [];
             const entries = lines.map(line => {
                 const plain = line.replace(/\*\*/g, '').replace(/`/g, '');
                 const statusMatch = plain.match(/^[✓✕·]\s+(ACCEPTED|REJECTED|DISMISSED[^:]*)/);
                 const status = statusMatch ? statusMatch[1] : 'UNKNOWN';
                 const restMatch = plain.match(/(?:ACCEPTED|REJECTED|DISMISSED[^:]*): (.+)/);
-                const detail = restMatch ? restMatch[1] : plain;
+                const detail = restMatch ? restMatch[1].trim() : plain;
                 return { status, detail };
             });
+
+            const ctg = msg.isCharEditHistory ? 'character_card_changes' : (msg.isChatEditHistory ? 'chat_messages_edits' : 'lorebook_changes');
+
             const obj = {
                 type: 'system_notification',
-                category: msg.isCharEditHistory ? 'character_card_changes' : 'lorebook_changes',
+                category: ctg,
                 entries,
             };
-            const jsonStr = JSON.stringify(obj);
-            return `${jsonStr}\n\n[System Note: Your generated code has been deleted to save tokens. This message indicates the user's actions and decisions regarding your proposed changes.]`;
+            const jsonStr = JSON.stringify(obj, null, 2);
+            return `${jsonStr}\n\n[System Note: Your generated \`${ctg}\` code block has been deleted to save tokens. This notification indicates the user's decision regarding your proposed changes. DO NOT regenerate it. Proceed with user's next request.]`;
         } catch (_) {
-            return msg.content;
+            return msg.content || '';
         }
     }
 
@@ -6770,11 +6956,33 @@ async function commitBucketChanges(force = false) {
         const limit = Math.max(1, parseInt(settings.localHistoryLimit) || 50);
         for (const m of session.messages.slice(-limit)) {
             let content = m.content;
+
+            const currentSwipe = m.swipes?.[m.swipeIndex || 0];
+            const hasAttachedHistory = currentSwipe?.historyLines?.length > 0;
+
             if (m.isLBHistory || m.isCharEditHistory || m.isChatEditHistory) {
                 content = _buildAiContextForHistoryMsg(m);
+                messages.push({ role: 'user', content: _mergeContent(content, m.attachments) });
+            } else {
+                const finalContent = _mergeContent(content, m.attachments);
+                let apiRole = m.role;
+                if (apiRole === 'system') apiRole = 'user';
+
+                messages.push({ role: apiRole, content: finalContent });
+
+                if (hasAttachedHistory) {
+                    let cat = 'system_action_results';
+                    const firstLine = currentSwipe.historyLines[0] || '';
+                    if (firstLine.includes('Character') || firstLine.includes('Tags') || firstLine.includes('Description') || firstLine.includes('Personality')) cat = 'character_card_changes';
+                    else if (firstLine.includes('message')) cat = 'chat_messages_edits';
+                    else cat = 'lorebook_changes';
+
+                    const dummy = { appliedLines: currentSwipe.historyLines, isCharEditHistory: cat === 'character_card_changes', isChatEditHistory: cat === 'chat_messages_edits' };
+                    const historyContext = _buildAiContextForHistoryMsg(dummy);
+
+                    messages.push({ role: 'user', content: historyContext });
+                }
             }
-            const finalContent = _mergeContent(content, m.attachments);
-            messages.push({ role: m.role, content: finalContent });
         }
         if (pendingUserText !== null && pendingUserText !== undefined) {
             const finalContent = _mergeContent(pendingUserText, pendingAtts);
