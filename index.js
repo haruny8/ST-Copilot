@@ -381,17 +381,6 @@ replacement text
 <overwrite field="FIELD_NAME">Complete replacement content for this field</overwrite>
 <prepend field="FIELD_NAME">Text to insert at the very beginning of the field</prepend>
 <append_text field="FIELD_NAME">Text to append at the very end of the field</append_text>
-
-<!-- ALTERNATE GREETINGS OPERATIONS -->
-<append field="alternate_greetings">New alternate greeting to add as a NEW entry</append>
-<overwrite field="alternate_greetings" index="1">Complete rewrite of the EXISTING greeting with id="1"</overwrite>
-<replace field="alternate_greetings" index="2">
-<<<<<<< ANCHOR
-first || last
-=======
-replacement text
->>>>>>> REPLACE
-</replace>
 \`\`\``;
 
     const CHAR_CREATE_FORMAT_BLOCK = `\`\`\`character-create
@@ -1640,21 +1629,7 @@ return result;
     }
 
     function normalizeCharNamesInBlock(text) {
-        const ctx = SillyTavern.getContext();
-        const charName = ctx.characters?.[ctx.characterId]?.name;
-        const userName = ctx.name1;
-        return text.replace(/(```(?:character-changes|character-create)[\s\S]*?(?:```|$))/g, block => {
-            let r = block;
-            if (charName && charName.length > 2) {
-                const charRe = new RegExp(`\\b${charName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
-                r = r.replace(charRe, '{{char}}');
-            }
-            if (userName && userName.length > 2) {
-                const userRe = new RegExp(`\\b${userName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
-                r = r.replace(userRe, '{{user}}');
-            }
-            return r;
-        });
+    return text;
     }
 
     function applySearchReplaceToField(fieldContent, searchText, replaceText) {
