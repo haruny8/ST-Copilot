@@ -1886,11 +1886,10 @@ export async function runContinue(session, targetMsgId) {
 
 export function setGeneratingState(on) {
     const bar = $('scp-thinking-bar'), sendBtn = $('scp-send-btn'),
-          input = $('scp-input'), regenBtn = $('scp-regen-btn');
+        input = $('scp-input');
     if (bar) bar.style.display = on ? 'flex' : 'none';
     if (sendBtn) sendBtn.disabled = on;
     if (input) input.disabled = on;
-    if (regenBtn) regenBtn.disabled = on;
     if (!on) {
         _refreshContinueBtns();
         _refreshSwipeBars(getCurrentSession());
