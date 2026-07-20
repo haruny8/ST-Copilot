@@ -290,7 +290,6 @@ function attachWindowListeners() {
 
     // Actions
     $('scp-inspect-btn')?.addEventListener('click', openInspector);
-    $('scp-regen-btn')?.addEventListener('click', handleRegen);
     const lbBtn = $('scp-lb-btn');
     if (lbBtn) {
         let _lbTouchPending = false;
