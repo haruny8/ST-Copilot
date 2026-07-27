@@ -248,7 +248,7 @@ export async function assembleMessages(session, settings, pendingUserText, pendi
             const block = processedSlice.map(m => {
                 const hiddenAttr = m.is_hidden ? ' hidden_from_ai="true"' : '';
                 const summarySourceAttrs = m.inlineSummarySourcePath
-                    ? ` inline_summary_index="${m.chatIndex}" inline_summary_path="${m.inlineSummarySourcePath.join('.')}"`
+                    ? ` inline_summary_path="${m.inlineSummarySourcePath.join('.')}"`
                     : '';
                 return `<msg index="${m.chatIndex}" role="${m.role === 'user' ? 'user' : 'assistant'}"${hiddenAttr}${summarySourceAttrs}>\n[${m.name}]: ${m.content}\n</msg>`;
             }).join('\n\n');
