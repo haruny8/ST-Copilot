@@ -1435,7 +1435,7 @@ const _PROFILE_KEYS = [
     'systemPrompt', 'includeSystemPrompt', 'includeAuthorsNote', 
     'includeCharacterCard', 'includeUserPersonality', 'contextDepth', 
     'localHistoryLimit', 'connectionSource', 'connectionProfileId', 'maxTokens',
-    'applyRegexToContext', 'reasoningTrimStrings', 'forceStreaming',
+    'applyRegexToContext', 'includeInlineSummaryOriginals', 'reasoningTrimStrings', 'forceStreaming',
     'charEditAIEnabled', 'charEditPrompt', 'lorebookAIManageEnabled',
     'lorebookManagePrompt', 'lorebookAutoKeyword', 'lorebookSTScanDepth',
     'lorebookCopilotScanDepth', 'chatEditAIEnabled', 'chatEditPrompt',
@@ -1504,6 +1504,7 @@ export function refreshProfilesDropdown() {
             connectionSource: 'default', connectionProfileId: '',
             maxTokens: 8200,
             applyRegexToContext: true,
+            includeInlineSummaryOriginals: false,
         };
         s.activeProfile = 'Default';
         saveSettings();

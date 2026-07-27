@@ -127,17 +127,28 @@ export function getSystemPromptText() {
     return ctx.systemPrompt || ctx.system_prompt || '';
 }
 
-export function getMainChatSlice(depth) {
+export function getMainChatSlice(depth, includeInlineSummaryOriginals = false) {
     const ctx = SillyTavern.getContext();
     if (!ctx.chat) return [];
     
-    const extractData = (m, i) => ({
+    const extractData = (m, i, inlineSummarySourcePath = null) => ({
         role: m.is_user ? 'user' : 'assistant',
         name: m.is_user ? (ctx.name1 || 'User') : (m.name || getCharInfo()?.name || 'Character'),
         content: typeof m.mes === 'string' ? m.mes : '',
         chatIndex: i,
+        inlineSummarySourcePath,
         is_hidden: !!m.is_system || !!m.is_hidden || !!(m.extra && m.extra.is_hidden)
     });
+
+    const extractVisibleMessage = (message, chatIndex) => {
+        const inlineSummaryApi = Reflect.get(globalThis, 'InlineSummary');
+        if (!includeInlineSummaryOriginals || inlineSummaryApi?.version !== 1 || !inlineSummaryApi.hasOriginalMessages?.(message)) {
+            return [extractData(message, chatIndex)];
+        }
+
+        return inlineSummaryApi.getOriginalMessages(message, { recursive: true })
+            .map(original => extractData(original, chatIndex, original.ilsSourcePath));
+    };
 
     try {
         const sess = getCurrentSession();
@@ -145,13 +156,13 @@ export function getMainChatSlice(depth) {
         if (picked && picked.length > 0) {
             return picked
                 .filter(i => i >= 0 && i < ctx.chat.length)
-                .map(i => extractData(ctx.chat[i], i));
+                .flatMap(i => extractVisibleMessage(ctx.chat[i], i));
         }
     } catch(_) {}
     
     if (depth === 0) return [];
     const total = ctx.chat.length;
-    return ctx.chat.slice(-depth).map((m, i) => extractData(m, total - depth + i));
+    return ctx.chat.slice(-depth).flatMap((m, i) => extractVisibleMessage(m, total - depth + i));
 }
 export async function buildSystemContent(settings) {
     const parts = [settings.systemPrompt || DEFAULT_SYSTEM_PROMPT];
@@ -223,9 +234,12 @@ export async function assembleMessages(session, settings, pendingUserText, pendi
     const depth = Math.max(0, parseInt(settings.contextDepth) || 0);
     const hasPicked = !!(session.pickedChatIndices && session.pickedChatIndices.length > 0);
     if (depth > 0 || hasPicked) {
-        const slice = getMainChatSlice(depth);
+        const slice = getMainChatSlice(depth, settings.includeInlineSummaryOriginals);
         if (slice.length) {
             const chatTotal = SillyTavern.getContext().chat?.length ?? 0;
+            const visibleContextCount = hasPicked
+                ? session.pickedChatIndices.filter(i => i >= 0 && i < chatTotal).length
+                : Math.min(depth, chatTotal);
             const processedSlice = await Promise.all(slice.map(async m => ({
                 ...m, content: await applyRegexIfEnabled(m.content, m.role === 'user', chatTotal - m.chatIndex - 1),
             })));
@@ -233,9 +247,12 @@ export async function assembleMessages(session, settings, pendingUserText, pendi
             const stMsgs = ctx.chat || [];
             const block = processedSlice.map(m => {
                 const hiddenAttr = m.is_hidden ? ' hidden_from_ai="true"' : '';
-                return `<msg index="${m.chatIndex}" role="${m.role === 'user' ? 'user' : 'assistant'}"${hiddenAttr}>\n[${m.name}]: ${m.content}\n</msg>`;
+                const summarySourceAttrs = m.inlineSummarySourcePath
+                    ? ` inline_summary_index="${m.chatIndex}" inline_summary_path="${m.inlineSummarySourcePath.join('.')}"`
+                    : '';
+                return `<msg index="${m.chatIndex}" role="${m.role === 'user' ? 'user' : 'assistant'}"${hiddenAttr}${summarySourceAttrs}>\n[${m.name}]: ${m.content}\n</msg>`;
             }).join('\n\n');
-            const ctxAttr = hasPicked ? `picked_messages="${slice.length}"` : `last_messages="${slice.length}"`;
+            const ctxAttr = hasPicked ? `picked_messages="${visibleContextCount}"` : `last_messages="${visibleContextCount}"`;
             messages.push({
                 role: 'user',
                 content: `<roleplay_context ${ctxAttr}>\n\n${block}\n\n</roleplay_context>`,

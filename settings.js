@@ -76,6 +76,7 @@ export function getSettings() {
         starredMessages: {},
         forceStreaming: 'auto',
         applyRegexToContext: true,
+        includeInlineSummaryOriginals: false,
         charEditAIEnabled: true,
         charEditPrompt: '',
         charEditFields: {
