@@ -142,12 +142,16 @@ export function getMainChatSlice(depth, includeInlineSummaryOriginals = false) {
 
     const extractVisibleMessage = (message, chatIndex) => {
         const inlineSummaryApi = Reflect.get(globalThis, 'InlineSummary');
-        if (!includeInlineSummaryOriginals || inlineSummaryApi?.version !== 1 || !inlineSummaryApi.hasOriginalMessages?.(message)) {
+        if (!includeInlineSummaryOriginals || inlineSummaryApi?.version !== 1 || typeof inlineSummaryApi.getOriginalMessages !== 'function') {
             return [extractData(message, chatIndex)];
         }
 
-        return inlineSummaryApi.getOriginalMessages(message, { recursive: true })
-            .map(original => extractData(original, chatIndex, original.ilsSourcePath));
+        const originals = inlineSummaryApi.getOriginalMessages(message, { recursive: true });
+        if (!Array.isArray(originals) || originals.length === 0) {
+            return [extractData(message, chatIndex)];
+        }
+
+        return originals.map(original => extractData(original, chatIndex, original.ilsSourcePath));
     };
 
     try {
