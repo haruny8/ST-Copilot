@@ -178,9 +178,6 @@ export async function buildSystemContent(settings) {
         if (sp) parts.push(`\n\n<st_system_prompt>\n${sp}\n</st_system_prompt>`);
     }
 
-    const lbBlock = await buildLorebookContextBlock(settings);
-    if (lbBlock) parts.push(lbBlock);
-
     {
         const editXml = buildCharacterContextBlock(settings);
         let inner = `Name: ${charInfo ? charInfo.name : (ctx.name2 || 'Character')}\n`;
@@ -194,6 +191,9 @@ export async function buildSystemContent(settings) {
         const inner = personaContent ? `Name: ${userName}\n${personaContent}` : `Name: ${userName}`;
         parts.push(`\n\n<${userName}_persona>\n${inner}\n</${userName}_persona>`);
     }
+
+    const lbBlock = await buildLorebookContextBlock(settings);
+    if (lbBlock) parts.push(lbBlock);
 
     const aiInstructions = buildLBAIInstructions(settings).trim();
     const charEditDirective = buildCharEditAIInstructions(settings).trim();
@@ -512,22 +512,36 @@ label = '▶ Roleplay Context' + (msgCount? ` (${msgCount} msgs)`: '') + (idx > 
             const tagRe = /<([^\s<>]+)>/g;
             let tm;
             tagRe.lastIndex = 0;
-            let moduleNavs = '';
+                const sectionKeys = new Set();
             while ((tm = tagRe.exec(raw)) !== null) {
                 const rawTag = tm[1];
                 if (!_ctxIsKnownTag(rawTag)) continue;
                 const key = _ctxSectionKey(rawTag);
-                const secLabel = _CTX_SECTION_LABELS[key];
-                if (!secLabel || seenSections.has(key)) continue;
-                seenSections.add(key);
-                const secId = `scp-ctx-sec-${key}`;
+                    if (_CTX_SECTION_LABELS[key]) sectionKeys.add(key);
+                }
+
+                const sectionOrder = [
+                    'character_information',
+                    'user_persona',
+                    'lorebook_context',
+                ];
+                const orderedSections = [
+                    ...sectionOrder,
+                    ...Array.from(sectionKeys).filter(key => !sectionOrder.includes(key)),
+                ];
+                let moduleNavs = '';
+                for (const key of orderedSections) {
+                    const secLabel = _CTX_SECTION_LABELS[key];
+                    if (!sectionKeys.has(key) || seenSections.has(key)) continue;
+                    seenSections.add(key);
+                    const secId = `scp-ctx-sec-${key}`;
 
                 if (_CTX_MODULE_KEYS.has(key)) {
                     moduleNavs += `<button class="scp-ctx-nav-btn scp-ctx-nav-sub" data-t="${secId}">&nbsp;&nbsp;◦ ${escHtml(secLabel)}</button>`;
                 } else {
                     navHtml += `<button class="scp-ctx-nav-btn scp-ctx-nav-sub" data-t="${secId}">&nbsp;&nbsp;◦ ${escHtml(secLabel)}</button>`;
                 }
-            }
+                }
             if (moduleNavs) {
                 navHtml += `<details class="scp-ctx-nav-details" open><summary class="scp-ctx-nav-btn" style="color:var(--scp-text)">▼ Modules</summary>${moduleNavs}</details>`;
             }
