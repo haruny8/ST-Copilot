@@ -109,6 +109,20 @@
 }
 .scp-header-right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 
+/* ── Header: wrap char badge to its own line on narrow phones ──
+   Prevents the title + character badge from getting crushed
+   into one row when there's not enough horizontal space. ── */
+@media screen and (max-width: 480px) {
+    .scp-header-left {
+        flex-wrap: wrap;
+        row-gap: 3px;
+    }
+    .scp-char-badge {
+        margin-left: 0;
+        max-width: calc(100vw - 80px);
+    }
+}
+
 .scp-hbtn {
     background: none; border: none; color: var(--scp-text-muted); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
@@ -2636,6 +2650,32 @@ details.scp-reasoning-block[open] .scp-reasoning-summary::before { transform: ro
 .scp-diff-word-rem { 
     background: rgba(255, 92, 92, 0.45); 
     border-radius: 2px; 
+}
+
+/* ── Diff Modal: mobile centering fix ─────────────────────────
+   Overrides the generic full-screen `.scp-modal` mobile rule
+   (from the @media max-width:768px block above) just for the
+   diff box, so it goes back to being a normal centered, content-
+   sized panel instead of a full-screen box with dead space. ── */
+@media screen and (max-width: 768px) {
+    .scp-modal.scp-diff-modal-box {
+        position: relative !important;
+        inset: auto !important;
+        top: auto !important;
+        left: auto !important;
+        right: auto !important;
+        bottom: auto !important;
+        width: calc(100vw - 32px) !important;
+        max-width: calc(100vw - 32px) !important;
+        height: auto !important;
+        max-height: 85vh !important;
+        max-height: 85dvh !important;
+        border-radius: 12px !important;
+    }
+    .scp-diff-modal-box .scp-diff-body {
+        max-height: 65vh !important;
+        max-height: 65dvh !important;
+    }
 }
 
 /* ── Mobile LB ───────────────────────────────────────────────── */
