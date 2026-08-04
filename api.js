@@ -207,6 +207,25 @@ export async function buildSystemContent(settings) {
     return parts.join('\n');
 }
 
+function buildPlotTrackerContextBlock(settings) {
+    if (!settings.includePlotTrackerContext) return '';
+    try {
+        const snapshot = globalThis.PlotTracker?.getContextSnapshot?.();
+        if (!snapshot || snapshot.schema !== 3) return '';
+        const plots = [...(snapshot.active || []), ...(snapshot.horizon || [])]
+            .filter((plot) => plot.title || plot.summary);
+        if (!plots.length) return '';
+        const lines = plots.map((plot, index) => {
+            const title = String(plot.title || '').replace(/[\r\n]+/g, ' ').trim();
+            const summary = String(plot.summary || '').replace(/[\r\n]+/g, ' ').trim();
+            return `- Plot ${index + 1}: ${title}; Description ${index + 1}: ${summary}`;
+        });
+        return `<plot_tracker>\nThese are active and future plot threads manually maintained by the human user. Use these as reference regarding the current story, but still infer to the <roleplay_context> for full accuracy checks.\n\n${lines.join('\n')}\n</plot_tracker>`;
+    } catch (_) {
+        return '';
+    }
+}
+
 export function _buildAiContextForHistoryMsg(msg) {
     try {
         const lines = msg.swipes?.[msg.swipeIndex || 0]?.historyLines || msg.appliedLines || [];
@@ -235,6 +254,11 @@ export function _buildAiContextForHistoryMsg(msg) {
 
 export async function assembleMessages(session, settings, pendingUserText, pendingAtts = null) {
     const messages = [{ role: 'system', content: await buildSystemContent(settings) }];
+    const plotTrackerBlock = buildPlotTrackerContextBlock(settings);
+    if (plotTrackerBlock) {
+        messages.push({ role: 'user', content: plotTrackerBlock });
+        messages.push({ role: 'assistant', content: 'Understood. I have reviewed the Plot Tracker continuity context.' });
+    }
     const depth = Math.max(0, parseInt(settings.contextDepth) || 0);
     const hasPicked = !!(session.pickedChatIndices && session.pickedChatIndices.length > 0);
     if (depth > 0 || hasPicked) {

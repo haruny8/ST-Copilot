@@ -92,6 +92,7 @@ export function syncOverlayUI(key, val) {
         connectionProfileId: 'scp-sp-conn-profile',
         includeSystemPrompt: 'scp-sp-include-sysprompt',
         includeUserPersonality: 'scp-sp-include-persona',
+        includePlotTrackerContext: 'scp-sp-include-plot-tracker',
         applyRegexToContext: 'scp-sp-apply-regex',
         includeInlineSummaryOriginals: 'scp-sp-inline-summary-originals',
         contextDepth: 'scp-sp-depth-slider',
@@ -140,6 +141,7 @@ export function syncOverlayUI(key, val) {
         connectionProfileId: 'scp-sp-ov-conn-profile',
         includeSystemPrompt: 'scp-sp-ov-include-sysprompt',
         includeUserPersonality: 'scp-sp-ov-include-persona',
+        includePlotTrackerContext: 'scp-sp-ov-include-plot-tracker',
         applyRegexToContext: 'scp-sp-ov-apply-regex',
         includeInlineSummaryOriginals: 'scp-sp-ov-inline-summary-originals',
         contextDepth: 'scp-sp-ov-depth-slider',
@@ -197,6 +199,7 @@ export function updateSettingsUI() {
     setI('scp-search-hotkey', 'searchHotkey');
     setC('scp-include-sysprompt', 'includeSystemPrompt');
     setC('scp-include-persona', 'includeUserPersonality');
+    setC('scp-include-plot-tracker', 'includePlotTrackerContext');
     setC('scp-apply-regex', 'applyRegexToContext');
     setC('scp-inline-summary-originals', 'includeInlineSummaryOriginals');
     setC('scp-icon-persistent', 'floatingIconPersistent');
@@ -342,6 +345,7 @@ export function setupSettingsHandlers() {
     bindCheck('scp-hotkey-enabled', 'hotkeyEnabled');
     bindCheck('scp-include-sysprompt', 'includeSystemPrompt', updCtx);
     bindCheck('scp-include-persona', 'includeUserPersonality', updCtx);
+    bindCheck('scp-include-plot-tracker', 'includePlotTrackerContext', updCtx);
     bindCheck('scp-apply-regex', 'applyRegexToContext');
     bindCheck('scp-inline-summary-originals', 'includeInlineSummaryOriginals', updCtx);
     
@@ -1118,6 +1122,7 @@ export function setupSettingsPanelListeners() {
             contextDepth:'scp-depth-slider', includeSystemPrompt:'scp-include-sysprompt',
             includeAuthorsNote:'scp-include-anote', includeCharacterCard:'scp-include-charcard',
             includeUserPersonality:'scp-include-persona', reasoningTrimStrings:'scp-reasoning-trim',
+            includePlotTrackerContext:'scp-include-plot-tracker',
             systemPrompt:'scp-sysprompt', lorebookManagePrompt:'scp-lb-manage-prompt',
             lorebookSTScanDepth:'scp-lb-st-scan-depth', lorebookCopilotScanDepth:'scp-lb-copilot-scan-depth',
             connectionProfileId:'scp-conn-profile',
@@ -1256,6 +1261,7 @@ export function setupSettingsPanelListeners() {
 
     bGCheck('scp-sp-include-sysprompt', 'includeSystemPrompt', () => updateMsgCount(getCurrentSession()));
     bGCheck('scp-sp-include-persona', 'includeUserPersonality', () => updateMsgCount(getCurrentSession()));
+    bGCheck('scp-sp-include-plot-tracker', 'includePlotTrackerContext', () => updateMsgCount(getCurrentSession()));
     bGCheck('scp-sp-apply-regex', 'applyRegexToContext');
     bGCheck('scp-sp-inline-summary-originals', 'includeInlineSummaryOriginals', () => updateMsgCount(getCurrentSession()));
     bGInput('scp-sp-reasoning-trim', 'reasoningTrimStrings');

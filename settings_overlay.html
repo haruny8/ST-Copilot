@@ -122,6 +122,7 @@
           <div class="scp-sp-group-title"><i class="fa-solid fa-box-archive"></i> Context Payload</div>
           <label class="scp-sp-check"><input type="checkbox" id="scp-sp-include-sysprompt"><span>Include ST System Prompt</span></label>
           <label class="scp-sp-check"><input type="checkbox" id="scp-sp-include-persona"><span>Include User Persona</span></label>
+          <label class="scp-sp-check"><input type="checkbox" id="scp-sp-include-plot-tracker"><span>Include Plot Tracker continuity context</span></label>
           <label class="scp-sp-check"><input type="checkbox" id="scp-sp-apply-regex"><span>Apply Regex to context <span class="scp-sp-hint">(ST Regex extension)</span></span></label>
           <label class="scp-sp-check" title="Replace Inline Summary messages in Copilot context with their recursively stored original messages. Summaries remain unchanged in SillyTavern."><input type="checkbox" id="scp-sp-inline-summary-originals"><span>Read originals inside Inline Summary</span></label>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;gap:5px">
@@ -316,6 +317,10 @@
           <div class="scp-sp-ov-check-row">
             <label class="scp-sp-check"><input type="checkbox" id="scp-sp-ov-include-persona"><span>Include User Persona</span></label>
             <button class="scp-sp-ov-clear" data-ovkey="includeUserPersonality" title="Clear override" disabled>↺</button>
+          </div>
+          <div class="scp-sp-ov-check-row">
+            <label class="scp-sp-check"><input type="checkbox" id="scp-sp-ov-include-plot-tracker"><span>Include Plot Tracker continuity context</span></label>
+            <button class="scp-sp-ov-clear" data-ovkey="includePlotTrackerContext" title="Clear override" disabled>↺</button>
           </div>
           <div class="scp-sp-ov-check-row">
             <label class="scp-sp-check"><input type="checkbox" id="scp-sp-ov-apply-regex"><span>Apply Regex to context</span></label>
