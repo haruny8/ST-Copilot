@@ -93,6 +93,7 @@ export function syncOverlayUI(key, val) {
         includeSystemPrompt: 'scp-sp-include-sysprompt',
         includeUserPersonality: 'scp-sp-include-persona',
         applyRegexToContext: 'scp-sp-apply-regex',
+        includeInlineSummaryOriginals: 'scp-sp-inline-summary-originals',
         contextDepth: 'scp-sp-depth-slider',
         wobbleWindow: 'scp-sp-wobble-window',
         performanceMode: 'scp-sp-perf-mode'
@@ -140,6 +141,7 @@ export function syncOverlayUI(key, val) {
         includeSystemPrompt: 'scp-sp-ov-include-sysprompt',
         includeUserPersonality: 'scp-sp-ov-include-persona',
         applyRegexToContext: 'scp-sp-ov-apply-regex',
+        includeInlineSummaryOriginals: 'scp-sp-ov-inline-summary-originals',
         contextDepth: 'scp-sp-ov-depth-slider',
         charField_tags: 'scp-sp-ov-ce-tags',
         charField_description: 'scp-sp-ov-ce-description',
@@ -196,6 +198,7 @@ export function updateSettingsUI() {
     setC('scp-include-sysprompt', 'includeSystemPrompt');
     setC('scp-include-persona', 'includeUserPersonality');
     setC('scp-apply-regex', 'applyRegexToContext');
+    setC('scp-inline-summary-originals', 'includeInlineSummaryOriginals');
     setC('scp-icon-persistent', 'floatingIconPersistent');
     setC('scp-ghost-hotkey-enabled', 'ghostModeHotkeyEnabled');
     setI('scp-hotkey', 'hotkey');
@@ -340,6 +343,7 @@ export function setupSettingsHandlers() {
     bindCheck('scp-include-sysprompt', 'includeSystemPrompt', updCtx);
     bindCheck('scp-include-persona', 'includeUserPersonality', updCtx);
     bindCheck('scp-apply-regex', 'applyRegexToContext');
+    bindCheck('scp-inline-summary-originals', 'includeInlineSummaryOriginals', updCtx);
     
     const stUpdateStreamBtns = (val) => {
         document.querySelectorAll('#scp-st-stream-auto, #scp-st-stream-on, #scp-st-stream-off').forEach(b => {
@@ -906,6 +910,7 @@ export function syncSPFromSettings() {
     gC('scp-sp-include-sysprompt', s.includeSystemPrompt);
     gC('scp-sp-include-persona', s.includeUserPersonality);
     gC('scp-sp-apply-regex', s.applyRegexToContext);
+    gC('scp-sp-inline-summary-originals', s.includeInlineSummaryOriginals);
     g('scp-sp-reasoning-trim', s.reasoningTrimStrings);
     g('scp-sp-sysprompt', s.systemPrompt || DEFAULT_SYSTEM_PROMPT);
     g('scp-sp-lb-manage-prompt', s.lorebookManagePrompt || DEFAULT_LB_MANAGE_PROMPT);
@@ -958,6 +963,7 @@ export function syncSPFromSettings() {
     gC('scp-sp-ov-include-sysprompt', eff.includeSystemPrompt);
     gC('scp-sp-ov-include-persona', eff.includeUserPersonality);
     gC('scp-sp-ov-apply-regex', eff.applyRegexToContext);
+    gC('scp-sp-ov-inline-summary-originals', eff.includeInlineSummaryOriginals);
 
     // Sync streaming override buttons
     const ovStreamVal = eff.forceStreaming === true ? 'on' : (eff.forceStreaming === false ? 'auto' : (eff.forceStreaming || 'auto'));
@@ -1048,7 +1054,7 @@ export function refreshSPProfilesDropdown() {
     const sel = document.getElementById('scp-sp-profile-select'); if (!sel) return;
     const s = getSettings();
     if (!Object.keys(s.profiles).length) {
-        s.profiles['Default'] = { systemPrompt: DEFAULT_SYSTEM_PROMPT, includeSystemPrompt: true, includeAuthorsNote: true, includeCharacterCard: true, includeUserPersonality: true, contextDepth: 15, localHistoryLimit: 50, connectionSource: 'default', connectionProfileId: '', maxTokens: 8200, applyRegexToContext: true };
+        s.profiles['Default'] = { systemPrompt: DEFAULT_SYSTEM_PROMPT, includeSystemPrompt: true, includeAuthorsNote: true, includeCharacterCard: true, includeUserPersonality: true, contextDepth: 15, localHistoryLimit: 50, connectionSource: 'default', connectionProfileId: '', maxTokens: 8200, applyRegexToContext: true, includeInlineSummaryOriginals: false };
         s.activeProfile = 'Default'; saveSettings();
     }
     sel.innerHTML = '';
@@ -1118,6 +1124,7 @@ export function setupSettingsPanelListeners() {
             opacity:'scp-opacity-slider', ghostModeOpacity:'scp-ghost-opacity',
             ghostModeHotkeyEnabled:'scp-ghost-hotkey-enabled', ghostModeHotkey:'scp-ghost-hotkey',
             applyRegexToContext:'scp-apply-regex',
+            includeInlineSummaryOriginals:'scp-inline-summary-originals',
             charEditAIEnabled: 'scp-char-edit-enabled',
             charEditPrompt: 'scp-char-edit-prompt',
             lorebookAIManageEnabled: 'scp-lb-ai-enabled-st',
@@ -1250,6 +1257,7 @@ export function setupSettingsPanelListeners() {
     bGCheck('scp-sp-include-sysprompt', 'includeSystemPrompt', () => updateMsgCount(getCurrentSession()));
     bGCheck('scp-sp-include-persona', 'includeUserPersonality', () => updateMsgCount(getCurrentSession()));
     bGCheck('scp-sp-apply-regex', 'applyRegexToContext');
+    bGCheck('scp-sp-inline-summary-originals', 'includeInlineSummaryOriginals', () => updateMsgCount(getCurrentSession()));
     bGInput('scp-sp-reasoning-trim', 'reasoningTrimStrings');
 
     document.getElementById('scp-sp-conn-source')?.addEventListener('change', e => {
@@ -1409,7 +1417,7 @@ export function setupSettingsPanelListeners() {
         const name = await showCustomDialog({ type: 'prompt', title: 'New Configuration', message: 'Name:', placeholder: 'New Config' });
         if (!name?.trim()) return;
         const n = name.trim(); const s = getSettings();
-        s.profiles[n] = { systemPrompt: DEFAULT_SYSTEM_PROMPT, includeSystemPrompt: true, includeAuthorsNote: true, includeCharacterCard: true, includeUserPersonality: true, contextDepth: 15, localHistoryLimit: 50, connectionSource: 'default', connectionProfileId: '', maxTokens: 8200, applyRegexToContext: true };
+        s.profiles[n] = { systemPrompt: DEFAULT_SYSTEM_PROMPT, includeSystemPrompt: true, includeAuthorsNote: true, includeCharacterCard: true, includeUserPersonality: true, contextDepth: 15, localHistoryLimit: 50, connectionSource: 'default', connectionProfileId: '', maxTokens: 8200, applyRegexToContext: true, includeInlineSummaryOriginals: false };
         saveSettings(); refreshSPProfilesDropdown(); refreshProfilesDropdown();
         loadProfile(n); syncSPFromSettings(); updateSettingsUI();
         const sel = document.getElementById('scp-sp-profile-select'); if (sel) sel.value = n;
@@ -1661,6 +1669,7 @@ export function setupSettingsPanelListeners() {
     bindOvCheck('scp-sp-ov-include-sysprompt', 'includeSystemPrompt');
     bindOvCheck('scp-sp-ov-include-persona', 'includeUserPersonality');
     bindOvCheck('scp-sp-ov-apply-regex', 'applyRegexToContext');
+    bindOvCheck('scp-sp-ov-inline-summary-originals', 'includeInlineSummaryOriginals');
     bindOvCheck('scp-sp-ov-char-edit-enabled', 'charEditAIEnabled');
     bindOvCheck('scp-sp-ov-lb-ai-enabled', 'lorebookAIManageEnabled');
     bindOvCheck('scp-sp-ov-chat-edit-enabled', 'chatEditAIEnabled');
@@ -1711,6 +1720,7 @@ export function setupSettingsPanelListeners() {
                 includeSystemPrompt: ['scp-sp-ov-include-sysprompt'],
                 includeUserPersonality: ['scp-sp-ov-include-persona'],
                 applyRegexToContext: ['scp-sp-ov-apply-regex'],
+                includeInlineSummaryOriginals: ['scp-sp-ov-inline-summary-originals'],
                 charField_tags: ['scp-sp-ov-ce-tags'],
                 charField_description: ['scp-sp-ov-ce-description'],
                 charField_personality: ['scp-sp-ov-ce-personality'],

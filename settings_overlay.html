@@ -123,6 +123,7 @@
           <label class="scp-sp-check"><input type="checkbox" id="scp-sp-include-sysprompt"><span>Include ST System Prompt</span></label>
           <label class="scp-sp-check"><input type="checkbox" id="scp-sp-include-persona"><span>Include User Persona</span></label>
           <label class="scp-sp-check"><input type="checkbox" id="scp-sp-apply-regex"><span>Apply Regex to context <span class="scp-sp-hint">(ST Regex extension)</span></span></label>
+          <label class="scp-sp-check" title="Replace Inline Summary messages in Copilot context with their recursively stored original messages. Summaries remain unchanged in SillyTavern."><input type="checkbox" id="scp-sp-inline-summary-originals"><span>Read originals inside Inline Summary</span></label>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;gap:5px">
             <div class="scp-sp-label" style="margin-bottom:2px">Character fields sent to AI context</div>
             <label class="scp-sp-check"><input type="checkbox" id="scp-sp-ce-tags"><span>Tags</span></label>
@@ -319,6 +320,10 @@
           <div class="scp-sp-ov-check-row">
             <label class="scp-sp-check"><input type="checkbox" id="scp-sp-ov-apply-regex"><span>Apply Regex to context</span></label>
             <button class="scp-sp-ov-clear" data-ovkey="applyRegexToContext" title="Clear override" disabled>↺</button>
+          </div>
+          <div class="scp-sp-ov-check-row">
+            <label class="scp-sp-check"><input type="checkbox" id="scp-sp-ov-inline-summary-originals"><span>Read originals inside Inline Summary</span></label>
+            <button class="scp-sp-ov-clear" data-ovkey="includeInlineSummaryOriginals" title="Clear override" disabled>↺</button>
           </div>
           <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)">
             <div class="scp-sp-label" style="margin-bottom:5px">Character fields <span class="scp-sp-hint">(override global)</span></div>

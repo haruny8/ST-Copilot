@@ -127,17 +127,32 @@ export function getSystemPromptText() {
     return ctx.systemPrompt || ctx.system_prompt || '';
 }
 
-export function getMainChatSlice(depth) {
+export function getMainChatSlice(depth, includeInlineSummaryOriginals = false) {
     const ctx = SillyTavern.getContext();
     if (!ctx.chat) return [];
     
-    const extractData = (m, i) => ({
+    const extractData = (m, i, inlineSummarySourcePath = null) => ({
         role: m.is_user ? 'user' : 'assistant',
         name: m.is_user ? (ctx.name1 || 'User') : (m.name || getCharInfo()?.name || 'Character'),
         content: typeof m.mes === 'string' ? m.mes : '',
         chatIndex: i,
+        inlineSummarySourcePath,
         is_hidden: !!m.is_system || !!m.is_hidden || !!(m.extra && m.extra.is_hidden)
     });
+
+    const extractVisibleMessage = (message, chatIndex) => {
+        const inlineSummaryApi = Reflect.get(globalThis, 'InlineSummary');
+        if (!includeInlineSummaryOriginals || inlineSummaryApi?.version !== 1 || typeof inlineSummaryApi.getOriginalMessages !== 'function') {
+            return [extractData(message, chatIndex)];
+        }
+
+        const originals = inlineSummaryApi.getOriginalMessages(message, { recursive: true });
+        if (!Array.isArray(originals) || originals.length === 0) {
+            return [extractData(message, chatIndex)];
+        }
+
+        return originals.map(original => extractData(original, chatIndex, original.ilsSourcePath));
+    };
 
     try {
         const sess = getCurrentSession();
@@ -145,13 +160,13 @@ export function getMainChatSlice(depth) {
         if (picked && picked.length > 0) {
             return picked
                 .filter(i => i >= 0 && i < ctx.chat.length)
-                .map(i => extractData(ctx.chat[i], i));
+                .flatMap(i => extractVisibleMessage(ctx.chat[i], i));
         }
     } catch(_) {}
     
     if (depth === 0) return [];
     const total = ctx.chat.length;
-    return ctx.chat.slice(-depth).map((m, i) => extractData(m, total - depth + i));
+    return ctx.chat.slice(-depth).flatMap((m, i) => extractVisibleMessage(m, total - depth + i));
 }
 export async function buildSystemContent(settings) {
     const parts = [settings.systemPrompt || DEFAULT_SYSTEM_PROMPT];
@@ -162,9 +177,6 @@ export async function buildSystemContent(settings) {
         const sp = getSystemPromptText();
         if (sp) parts.push(`\n\n<st_system_prompt>\n${sp}\n</st_system_prompt>`);
     }
-
-    const lbBlock = await buildLorebookContextBlock(settings);
-    if (lbBlock) parts.push(lbBlock);
 
     {
         const editXml = buildCharacterContextBlock(settings);
@@ -179,6 +191,9 @@ export async function buildSystemContent(settings) {
         const inner = personaContent ? `Name: ${userName}\n${personaContent}` : `Name: ${userName}`;
         parts.push(`\n\n<${userName}_persona>\n${inner}\n</${userName}_persona>`);
     }
+
+    const lbBlock = await buildLorebookContextBlock(settings);
+    if (lbBlock) parts.push(lbBlock);
 
     const aiInstructions = buildLBAIInstructions(settings).trim();
     const charEditDirective = buildCharEditAIInstructions(settings).trim();
@@ -223,9 +238,12 @@ export async function assembleMessages(session, settings, pendingUserText, pendi
     const depth = Math.max(0, parseInt(settings.contextDepth) || 0);
     const hasPicked = !!(session.pickedChatIndices && session.pickedChatIndices.length > 0);
     if (depth > 0 || hasPicked) {
-        const slice = getMainChatSlice(depth);
+        const slice = getMainChatSlice(depth, settings.includeInlineSummaryOriginals);
         if (slice.length) {
             const chatTotal = SillyTavern.getContext().chat?.length ?? 0;
+            const visibleContextCount = hasPicked
+                ? session.pickedChatIndices.filter(i => i >= 0 && i < chatTotal).length
+                : Math.min(depth, chatTotal);
             const processedSlice = await Promise.all(slice.map(async m => ({
                 ...m, content: await applyRegexIfEnabled(m.content, m.role === 'user', chatTotal - m.chatIndex - 1),
             })));
@@ -233,9 +251,12 @@ export async function assembleMessages(session, settings, pendingUserText, pendi
             const stMsgs = ctx.chat || [];
             const block = processedSlice.map(m => {
                 const hiddenAttr = m.is_hidden ? ' hidden_from_ai="true"' : '';
-                return `<msg index="${m.chatIndex}" role="${m.role === 'user' ? 'user' : 'assistant'}"${hiddenAttr}>\n[${m.name}]: ${m.content}\n</msg>`;
+                const summarySourceAttrs = m.inlineSummarySourcePath
+                    ? ` inline_summary_path="${m.inlineSummarySourcePath.join('.')}"`
+                    : '';
+                return `<msg index="${m.chatIndex}" role="${m.role === 'user' ? 'user' : 'assistant'}"${hiddenAttr}${summarySourceAttrs}>\n[${m.name}]: ${m.content}\n</msg>`;
             }).join('\n\n');
-            const ctxAttr = hasPicked ? `picked_messages="${slice.length}"` : `last_messages="${slice.length}"`;
+            const ctxAttr = hasPicked ? `picked_messages="${visibleContextCount}"` : `last_messages="${visibleContextCount}"`;
             messages.push({
                 role: 'user',
                 content: `<roleplay_context ${ctxAttr}>\n\n${block}\n\n</roleplay_context>`,
@@ -491,22 +512,36 @@ label = '▶ Roleplay Context' + (msgCount? ` (${msgCount} msgs)`: '') + (idx > 
             const tagRe = /<([^\s<>]+)>/g;
             let tm;
             tagRe.lastIndex = 0;
-            let moduleNavs = '';
+                const sectionKeys = new Set();
             while ((tm = tagRe.exec(raw)) !== null) {
                 const rawTag = tm[1];
                 if (!_ctxIsKnownTag(rawTag)) continue;
                 const key = _ctxSectionKey(rawTag);
-                const secLabel = _CTX_SECTION_LABELS[key];
-                if (!secLabel || seenSections.has(key)) continue;
-                seenSections.add(key);
-                const secId = `scp-ctx-sec-${key}`;
+                    if (_CTX_SECTION_LABELS[key]) sectionKeys.add(key);
+                }
+
+                const sectionOrder = [
+                    'character_information',
+                    'user_persona',
+                    'lorebook_context',
+                ];
+                const orderedSections = [
+                    ...sectionOrder,
+                    ...Array.from(sectionKeys).filter(key => !sectionOrder.includes(key)),
+                ];
+                let moduleNavs = '';
+                for (const key of orderedSections) {
+                    const secLabel = _CTX_SECTION_LABELS[key];
+                    if (!sectionKeys.has(key) || seenSections.has(key)) continue;
+                    seenSections.add(key);
+                    const secId = `scp-ctx-sec-${key}`;
 
                 if (_CTX_MODULE_KEYS.has(key)) {
                     moduleNavs += `<button class="scp-ctx-nav-btn scp-ctx-nav-sub" data-t="${secId}">&nbsp;&nbsp;◦ ${escHtml(secLabel)}</button>`;
                 } else {
                     navHtml += `<button class="scp-ctx-nav-btn scp-ctx-nav-sub" data-t="${secId}">&nbsp;&nbsp;◦ ${escHtml(secLabel)}</button>`;
                 }
-            }
+                }
             if (moduleNavs) {
                 navHtml += `<details class="scp-ctx-nav-details" open><summary class="scp-ctx-nav-btn" style="color:var(--scp-text)">▼ Modules</summary>${moduleNavs}</details>`;
             }
