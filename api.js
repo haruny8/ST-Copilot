@@ -215,10 +215,10 @@ function buildPlotTrackerContextBlock(settings) {
         const plots = [...(snapshot.active || []), ...(snapshot.horizon || [])]
             .filter((plot) => plot.title || plot.summary);
         if (!plots.length) return '';
-        const lines = plots.map((plot, index) => {
+        const lines = plots.map((plot) => {
             const title = String(plot.title || '').replace(/[\r\n]+/g, ' ').trim();
             const summary = String(plot.summary || '').replace(/[\r\n]+/g, ' ').trim();
-            return `- Plot ${index + 1}: ${title}; Description ${index + 1}: ${summary}`;
+            return `- ${title}: ${summary}`;
         });
         return `<plot_tracker>\nThese are active and future plot threads manually maintained by the human user. Use these as reference regarding the current story, but still infer to the <roleplay_context> for full accuracy checks.\n\n${lines.join('\n')}\n</plot_tracker>`;
     } catch (_) {
@@ -257,7 +257,6 @@ export async function assembleMessages(session, settings, pendingUserText, pendi
     const plotTrackerBlock = buildPlotTrackerContextBlock(settings);
     if (plotTrackerBlock) {
         messages.push({ role: 'user', content: plotTrackerBlock });
-        messages.push({ role: 'assistant', content: 'Understood. I have reviewed the Plot Tracker continuity context.' });
     }
     const depth = Math.max(0, parseInt(settings.contextDepth) || 0);
     const hasPicked = !!(session.pickedChatIndices && session.pickedChatIndices.length > 0);
@@ -517,8 +516,11 @@ export function buildContextInspectorHTML(messages) {
 
 const LABELS = { system: '■ SYSTEM', user: '▶ USER', assistant: '◀ ASSISTANT' };
 let label = (LABELS[displayRole] || displayRole) + (idx > 0? ` #${idx}`: '');
-// If this is a user message that contains roleplay_context, label it properly
-if (displayRole === 'user' && raw.includes('<roleplay_context')) {
+// Context messages can mention other tag names in their instructions, so
+// classify only structural opening tags that begin a line.
+if (displayRole === 'user' && /^<plot_tracker>\r?$/m.test(raw)) {
+label = '▶ Plot Tracker' + (idx > 0? ` #${idx}`: '');
+} else if (displayRole === 'user' && /^<roleplay_context(?:\s[^>]*)?>\r?$/m.test(raw)) {
 const pickedMatch = raw.match(/picked_messages="(\d+)"/);
 const lastMatch = raw.match(/last_messages="(\d+)"/);
 const msgCount = pickedMatch? pickedMatch[1]: (lastMatch? lastMatch[1]: '');
