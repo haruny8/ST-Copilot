@@ -33,7 +33,7 @@ import { EXT_DISPLAY } from './constants.js';
 import { DEFAULT_SYSTEM_PROMPT } from './default-prompts.js';
 import { escHtml } from './utils/util-dom.js';
 import { getUserPersona } from './utils/util-st.js';
-import { getCurrentSession } from './session.js';
+import { getCurrentSession, parseChatPickKey } from './session.js';
 import { applyRegexIfEnabled, buildLorebookContextBlock, buildLBAIInstructions } from './features/feature-lorebook-engine.js';
 import { buildCharacterContextBlock, buildCharEditAIInstructions, buildChatEditAIInstructions } from './features/feature-character-engine.js';
 import { mergeContent } from './features/feature-attachments.js';
@@ -127,46 +127,54 @@ export function getSystemPromptText() {
     return ctx.systemPrompt || ctx.system_prompt || '';
 }
 
+export function getMainChatMessageEntries(message, chatIndex, includeInlineSummaryOriginals = false) {
+    const ctx = SillyTavern.getContext();
+    const extractData = (source, inlineSummarySourcePath = null) => ({
+        role: source.is_user ? 'user' : 'assistant',
+        name: source.is_user ? (ctx.name1 || 'User') : (source.name || getCharInfo()?.name || 'Character'),
+        content: typeof source.mes === 'string' ? source.mes : '',
+        chatIndex,
+        inlineSummarySourcePath,
+        is_hidden: !!source.is_system || !!source.is_hidden || !!(source.extra && source.extra.is_hidden)
+    });
+    const inlineSummaryApi = Reflect.get(globalThis, 'InlineSummary');
+    if (!includeInlineSummaryOriginals || inlineSummaryApi?.version !== 1 || typeof inlineSummaryApi.getOriginalMessages !== 'function') {
+        return [extractData(message)];
+    }
+    const originals = inlineSummaryApi.getOriginalMessages(message, { recursive: true });
+    if (!Array.isArray(originals) || originals.length === 0) return [extractData(message)];
+    return originals.map(original => extractData(original, original.ilsSourcePath));
+}
+
 export function getMainChatSlice(depth, includeInlineSummaryOriginals = false) {
     const ctx = SillyTavern.getContext();
     if (!ctx.chat) return [];
-    
-    const extractData = (m, i, inlineSummarySourcePath = null) => ({
-        role: m.is_user ? 'user' : 'assistant',
-        name: m.is_user ? (ctx.name1 || 'User') : (m.name || getCharInfo()?.name || 'Character'),
-        content: typeof m.mes === 'string' ? m.mes : '',
-        chatIndex: i,
-        inlineSummarySourcePath,
-        is_hidden: !!m.is_system || !!m.is_hidden || !!(m.extra && m.extra.is_hidden)
-    });
-
-    const extractVisibleMessage = (message, chatIndex) => {
-        const inlineSummaryApi = Reflect.get(globalThis, 'InlineSummary');
-        if (!includeInlineSummaryOriginals || inlineSummaryApi?.version !== 1 || typeof inlineSummaryApi.getOriginalMessages !== 'function') {
-            return [extractData(message, chatIndex)];
-        }
-
-        const originals = inlineSummaryApi.getOriginalMessages(message, { recursive: true });
-        if (!Array.isArray(originals) || originals.length === 0) {
-            return [extractData(message, chatIndex)];
-        }
-
-        return originals.map(original => extractData(original, chatIndex, original.ilsSourcePath));
-    };
 
     try {
         const sess = getCurrentSession();
         const picked = sess.pickedChatIndices;
         if (picked && picked.length > 0) {
-            return picked
-                .filter(i => i >= 0 && i < ctx.chat.length)
-                .flatMap(i => extractVisibleMessage(ctx.chat[i], i));
+            const selected = [];
+            for (const key of picked) {
+                const parsed = parseChatPickKey(key);
+                if (!parsed || parsed.chatIndex < 0 || parsed.chatIndex >= ctx.chat.length) continue;
+                const expanded = getMainChatMessageEntries(ctx.chat[parsed.chatIndex], parsed.chatIndex, includeInlineSummaryOriginals);
+                if (!parsed.inlineSummarySourcePath) {
+                    selected.push(...expanded);
+                    continue;
+                }
+                const sourcePath = parsed.inlineSummarySourcePath.join('.');
+                const original = expanded.find(message => message.inlineSummarySourcePath?.join('.') === sourcePath);
+                if (original) selected.push(original);
+            }
+            return selected;
         }
     } catch(_) {}
     
     if (depth === 0) return [];
     const total = ctx.chat.length;
-    return ctx.chat.slice(-depth).flatMap((m, i) => extractVisibleMessage(m, total - depth + i));
+    return ctx.chat.slice(-depth).flatMap((message, index) =>
+        getMainChatMessageEntries(message, total - depth + index, includeInlineSummaryOriginals));
 }
 export async function buildSystemContent(settings) {
     const parts = [settings.systemPrompt || DEFAULT_SYSTEM_PROMPT];
@@ -265,7 +273,10 @@ export async function assembleMessages(session, settings, pendingUserText, pendi
         if (slice.length) {
             const chatTotal = SillyTavern.getContext().chat?.length ?? 0;
             const visibleContextCount = hasPicked
-                ? session.pickedChatIndices.filter(i => i >= 0 && i < chatTotal).length
+                ? session.pickedChatIndices.filter(key => {
+                    const parsed = parseChatPickKey(key);
+                    return parsed && parsed.chatIndex >= 0 && parsed.chatIndex < chatTotal;
+                }).length
                 : Math.min(depth, chatTotal);
             const processedSlice = await Promise.all(slice.map(async m => ({
                 ...m, content: await applyRegexIfEnabled(m.content, m.role === 'user', chatTotal - m.chatIndex - 1),
