@@ -405,9 +405,6 @@ export async function openInspector() {
 
     const fmtEl = $('scp-ctx-formatted'); const jsonEl = $('scp-ctx-json');
 
-    const modal = getModalEl()?.querySelector('.scp-modal');
-    if (modal) modal.style.height = '75vh';
-
     const modalBody = getModalEl()?.querySelector('.scp-modal-body');
     if (modalBody) {
         modalBody.style.padding = '0';
@@ -415,6 +412,7 @@ export async function openInspector() {
         modalBody.style.display = 'flex';
         modalBody.style.flexDirection = 'column';
         modalBody.style.height = '100%';
+        modalBody.style.minHeight = '0';
     }
 
     if (fmtEl) {
@@ -422,22 +420,30 @@ export async function openInspector() {
         fmtEl.style.flex = '1';
         fmtEl.style.overflow = 'hidden';
         fmtEl.style.padding = '0';
+        fmtEl.style.minHeight = '0';
         fmtEl.innerHTML = buildContextInspectorHTML(messages);
 
 fmtEl.querySelectorAll('.scp-ctx-nav-btn[data-t]').forEach(btn => {
-btn.addEventListener('click', () => {
-const targetId = btn.dataset.t;
-const bodyContainer = document.getElementById('scp-ctx-body');
-if (!bodyContainer) return;
-const t = bodyContainer.querySelector('#' + CSS.escape(targetId));
-if (!t) { console.warn('[ST-Copilot] Nav target not found:', targetId); return; }
-const tRect = t.getBoundingClientRect();
-const cRect = bodyContainer.getBoundingClientRect();
-bodyContainer.scrollTo({ top: bodyContainer.scrollTop + tRect.top - cRect.top, behavior: 'smooth' });
-});
+    btn.addEventListener('click', () => {
+        fmtEl.querySelectorAll('.scp-ctx-nav-btn').forEach(b => b.classList.remove('scp-ctx-nav-active'));
+        btn.classList.add('scp-ctx-nav-active');
+        const targetId = btn.dataset.t;
+        const bodyContainer = document.getElementById('scp-ctx-body');
+        if (!bodyContainer) return;
+        const t = bodyContainer.querySelector('#' + CSS.escape(targetId));
+        if (!t) { console.warn('[ST-Copilot] Nav target not found:', targetId); return; }
+        const tRect = t.getBoundingClientRect();
+        const cRect = bodyContainer.getBoundingClientRect();
+        bodyContainer.scrollTo({ top: bodyContainer.scrollTop + tRect.top - cRect.top, behavior: 'smooth' });
+    });
 });
     }
-    if (jsonEl) jsonEl.textContent = JSON.stringify(messages, null, 2);
+    if (jsonEl) {
+        jsonEl.style.flex = '1';
+        jsonEl.style.minHeight = '0';
+        jsonEl.style.overflow = 'auto';
+        jsonEl.textContent = JSON.stringify(messages, null, 2);
+    }
     getModalEl().style.display = 'flex';
 
     setTimeout(() => {

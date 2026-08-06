@@ -254,7 +254,7 @@ export function _buildAiContextForHistoryMsg(msg) {
             entries,
         };
         const jsonStr = JSON.stringify(obj, null, 2);
-        return `${jsonStr}\n\n[System Note: Your generated \`${ctg}\` code block has been deleted to save tokens. This notification indicates the user's decision regarding your proposed changes. DO NOT regenerate it. Proceed with user's next request.]`;
+        return `${jsonStr}\n\n[System Note: Your proposed \`${ctg}\` code block was successfully delivered and reviewed by the user (see status above). The code block has now been deleted to save tokens. DO NOT resend it. Proceed with user's next request.]`;
     } catch (_) {
         return msg.content || '';
     }
@@ -397,7 +397,7 @@ const _CTX_SECTION_LABELS = {
 // top-level nav entry.
 const _CTX_MODULE_KEYS = new Set(['lorebook_management', 'character_management', 'chat_messages_editing']);
 
-export function _highlightContextText(raw) {
+export function _highlightContextText(raw, anchorKeys = null) {
     const events = [];
     // NOTE: the code-block group intentionally does NOT fall back to end-of-
     // string (no |$ alternative). If a ``` is never closed (e.g. the prompt
@@ -491,9 +491,9 @@ lastOpenIndex.set(key, start);
             }
 
             const openTag = match.match(/^<([^\s>]+)>$/);
-            if (openTag && _ctxIsKnownTag(openTag[1])) {
+            if (anchorKeys !== false && openTag && _ctxIsKnownTag(openTag[1])) {
                 const key = _ctxSectionKey(openTag[1]);
-                if (start === lastOpenIndex.get(key)) {
+                if ((!anchorKeys || anchorKeys.has(key)) && start === lastOpenIndex.get(key)) {
                     html += `<span id="scp-ctx-sec-${escHtml(key)}" class="scp-ctx-anchor"></span>`;
                 }
             }
@@ -511,6 +511,47 @@ lastOpenIndex.set(key, start);
     return html;
 }
 
+function _buildSystemInspectorBlocks(raw, blockId) {
+    const sections = [
+        { key: 'character_information', label: 'Character', className: 'character', pattern: /^<character_information>\r?$/m },
+        { key: 'user_persona', label: 'User Persona', className: 'persona', pattern: /^<[^\s<>]+_persona>\r?$/m },
+        { key: 'lorebook_context', label: 'Lorebook', className: 'lorebook', pattern: /^<lorebook_context>\r?$/m },
+        { key: 'character_management', label: 'Character Card AI Edits', className: 'module', pattern: /^<character_management>\r?$/m },
+        { key: 'lorebook_management', label: 'Lorebook AI Edits', className: 'module', pattern: /^<lorebook_management>\r?$/m },
+        { key: 'chat_messages_editing', label: 'Chat Message AI Edits', className: 'module', pattern: /^<chat_messages_editing>\r?$/m },
+    ];
+    const boundaries = sections.map(section => {
+        const match = section.pattern.exec(raw);
+        return match ? { ...section, index: match.index } : null;
+    }).filter(Boolean).sort((left, right) => left.index - right.index);
+
+    const firstModule = boundaries.find(section => section.className === 'module');
+    if (firstModule) {
+        const moduleWrappers = Array.from(raw.matchAll(/^<modules>\r?$/gm));
+        for (let index = moduleWrappers.length - 1; index >= 0; index--) {
+            if (moduleWrappers[index].index >= firstModule.index) continue;
+            firstModule.index = moduleWrappers[index].index;
+            break;
+        }
+    }
+
+    const allSections = [{ label: 'System Prompt', className: 'system-prompt', index: 0, id: blockId }, ...boundaries.map(section => ({
+        ...section,
+        id: `scp-ctx-sec-${section.key}`,
+    }))];
+
+    return allSections.map((section, index) => {
+        const nextSection = allSections[index + 1];
+        const content = raw.slice(section.index, nextSection?.index).trim();
+        if (!content) return '';
+        return `<article class="scp-ctx-block scp-ctx-timeline-item scp-ctx-section-${section.className}" id="${section.id}">` +
+            `<span class="scp-ctx-timeline-dot" aria-hidden="true"></span>` +
+            `<div class="scp-ctx-block-header">${escHtml(section.label)}</div>` +
+            `<div class="scp-ctx-block-body"><pre class="scp-ctx-pre">${_highlightContextText(content, _CTX_MODULE_KEYS)}</pre></div>` +
+            `</article>`;
+    }).join('');
+}
+
 export function buildContextInspectorHTML(messages) {
     let navHtml = '', bodyHtml = '';
     let seenSections = new Set();
@@ -525,26 +566,26 @@ export function buildContextInspectorHTML(messages) {
             displayRole = 'system';
         }
 
-const LABELS = { system: '■ SYSTEM', user: '▶ USER', assistant: '◀ ASSISTANT' };
+const LABELS = { system: 'System', user: 'User', assistant: 'Assistant' };
 let label = (LABELS[displayRole] || displayRole) + (idx > 0? ` #${idx}`: '');
 // Context messages can mention other tag names in their instructions, so
 // classify only structural opening tags that begin a line.
 if (displayRole === 'user' && /^<plot_tracker>\r?$/m.test(raw)) {
-label = '▶ Plot Tracker' + (idx > 0? ` #${idx}`: '');
+label = 'Plot Tracker' + (idx > 0? ` #${idx}`: '');
 } else if (displayRole === 'user' && /^<roleplay_context(?:\s[^>]*)?>\r?$/m.test(raw)) {
 const pickedMatch = raw.match(/picked_messages="(\d+)"/);
 const lastMatch = raw.match(/last_messages="(\d+)"/);
 const msgCount = pickedMatch? pickedMatch[1]: (lastMatch? lastMatch[1]: '');
-label = '▶ Roleplay Context' + (msgCount? ` (${msgCount} msgs)`: '') + (idx > 0? ` #${idx}`: '');
+label = 'Roleplay Context' + (msgCount? ` (${msgCount} msgs)`: '') + (idx > 0? ` #${idx}`: '');
 }
         const blockId = `scp-ctx-b${idx}`;
 
-        navHtml += `<button class="scp-ctx-nav-btn scp-ctx-nav-${displayRole}" data-t="${blockId}">${escHtml(label)}</button>`;
+        if (msg.role !== 'system') {
+            navHtml += `<button class="scp-ctx-nav-btn scp-ctx-nav-${displayRole}" data-t="${blockId}">${escHtml(label)}</button>`;
+        }
 
         if (msg.role === 'system') {
-            // This fork doesn't wrap the system prompt itself in its own
-            // tag, so "System Prompt" just points at the top of the block.
-            navHtml += `<button class="scp-ctx-nav-btn scp-ctx-nav-sub" data-t="${blockId}">&nbsp;&nbsp;◦ System Prompt</button>`;
+            navHtml += `<button class="scp-ctx-nav-btn scp-ctx-nav-sub scp-ctx-nav-section-system-prompt" data-t="${blockId}">System Prompt</button>`;
 
             const tagRe = /<([^\s<>]+)>/g;
             let tm;
@@ -574,34 +615,36 @@ label = '▶ Roleplay Context' + (msgCount? ` (${msgCount} msgs)`: '') + (idx > 
                     const secId = `scp-ctx-sec-${key}`;
 
                 if (_CTX_MODULE_KEYS.has(key)) {
-                    moduleNavs += `<button class="scp-ctx-nav-btn scp-ctx-nav-sub" data-t="${secId}">&nbsp;&nbsp;◦ ${escHtml(secLabel)}</button>`;
+                    moduleNavs += `<button class="scp-ctx-nav-btn scp-ctx-nav-sub scp-ctx-nav-module-item" data-t="${secId}">${escHtml(secLabel)}</button>`;
                 } else {
-                    navHtml += `<button class="scp-ctx-nav-btn scp-ctx-nav-sub" data-t="${secId}">&nbsp;&nbsp;◦ ${escHtml(secLabel)}</button>`;
+                    navHtml += `<button class="scp-ctx-nav-btn scp-ctx-nav-sub scp-ctx-nav-section-${key}" data-t="${secId}">${escHtml(secLabel)}</button>`;
                 }
                 }
             if (moduleNavs) {
-                navHtml += `<details class="scp-ctx-nav-details" open><summary class="scp-ctx-nav-btn" style="color:var(--scp-text)">▼ Modules</summary>${moduleNavs}</details>`;
+                navHtml += `<details class="scp-ctx-nav-details" open><summary class="scp-ctx-nav-btn scp-ctx-nav-modules">Modules</summary>${moduleNavs}</details>`;
             }
         }
 
-        const highlighted = _highlightContextText(raw);
-        bodyHtml += `<div class="scp-ctx-block" id="${blockId}">`;
-        bodyHtml += `<div class="scp-ctx-block-header scp-ctx-role-${displayRole}">${escHtml(label)}</div>`;
-        bodyHtml += `<div class="scp-ctx-block-sep"></div>`;
-        bodyHtml += `<div class="scp-ctx-block-body"><pre class="scp-ctx-pre">${highlighted}</pre></div>`;
-        bodyHtml += `</div>`;
+        if (msg.role === 'system') {
+            bodyHtml += _buildSystemInspectorBlocks(raw, blockId);
+        } else {
+            const highlighted = _highlightContextText(raw);
+            bodyHtml += `<article class="scp-ctx-block scp-ctx-timeline-item scp-ctx-role-${displayRole}" id="${blockId}">`;
+            bodyHtml += `<span class="scp-ctx-timeline-dot" aria-hidden="true"></span>`;
+            bodyHtml += `<div class="scp-ctx-block-header">${escHtml(label)}</div>`;
+            bodyHtml += `<div class="scp-ctx-block-body"><pre class="scp-ctx-pre">${highlighted}</pre></div>`;
+            bodyHtml += `</article>`;
+        }
     });
 
     const styleHtml = `<style>
-        .scp-ctx-hl-tag-d0 { color: #eff6ff !important; }
-        .scp-ctx-hl-tag-d1 { color: #bfdbfe !important; }
-        .scp-ctx-hl-tag-d2 { color: #93c5fd !important; }
-        .scp-ctx-hl-tag-d3 { color: rgb(106, 165, 236) !important; }
-        .scp-ctx-hl-tag-d4 { color: rgb(100, 158, 253) !important; }
-        .scp-ctx-hl-tag-d5 { color: rgb(74, 120, 221) !important; }
+        .scp-ctx-hl-tag-d0, .scp-ctx-hl-tag-d1, .scp-ctx-hl-tag-d2,
+        .scp-ctx-hl-tag-d3, .scp-ctx-hl-tag-d4, .scp-ctx-hl-tag-d5 {
+            color: #71b7fb !important;
+        }
     </style>`;
 
-    return `<div class="scp-ctx-inspector">${styleHtml}<nav class="scp-ctx-nav">${navHtml}</nav><div class="scp-ctx-body" id="scp-ctx-body">${bodyHtml}</div></div>`;
+    return `<div class="scp-ctx-inspector">${styleHtml}<nav class="scp-ctx-nav"><div class="scp-ctx-nav-title">Timeline</div>${navHtml}</nav><div class="scp-ctx-body" id="scp-ctx-body">${bodyHtml}</div></div>`;
 }
 let _abortController = null;
 
