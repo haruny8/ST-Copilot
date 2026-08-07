@@ -814,7 +814,12 @@ function renderPickerMessages() {
     body.appendChild(frag);
     _updatePickerCountEl(pickedSet.size);
     const firstSel = body.querySelector('.scp-picker-row.selected');
-    if (firstSel) setTimeout(() => firstSel.scrollIntoView({ block: 'center' }), 50);
+    if (firstSel) {
+        setTimeout(() => {
+            const targetTop = firstSel.offsetTop - (body.clientHeight - firstSel.offsetHeight) / 2;
+            body.scrollTop = Math.max(0, targetTop);
+        }, 50);
+    }
 }
 
 function _updatePickerCountEl(count) {
