@@ -407,7 +407,7 @@ export function _highlightContextText(raw, anchorKeys = null) {
     // the tokenizer so their nav anchors are never inserted. Requiring a
     // real closing ``` means unclosed fences simply don't match, and the
     // tags that follow them are tokenized correctly.
-    const masterRe = /(```[\s\S]*?```)|(`[^`\n]*`)|(<\/?[^\s<>][^>]*>|<!--[\s\S]*?-->)|(\{\{[^}\n]+\}\})/gi;
+    const masterRe = /(```[\s\S]*?```)|(`[^`\n]*`)|(<\/?[A-Za-z_][A-Za-z0-9_.:-]*(?:\s[^<>]*)?>|<!--[\s\S]*?-->)|(\{\{[^}\n]+\}\})/gi;
 
     let m;
     masterRe.lastIndex = 0;

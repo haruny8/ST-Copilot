@@ -125,6 +125,15 @@
             <pre id="scp-ctx-json" class="scp-ctx-pre" style="display:none"></pre>
         </div>
         <div class="scp-modal-footer">
+            <label class="scp-ctx-search" for="scp-ctx-search-input">
+                <span class="scp-ctx-search-icon" aria-hidden="true">${I.search}</span>
+                <input type="search" id="scp-ctx-search-input" placeholder="Search payload" autocomplete="off" spellcheck="false">
+            </label>
+            <span class="scp-ctx-search-count" id="scp-ctx-search-count" aria-live="polite"></span>
+            <div class="scp-ctx-search-nav" aria-label="Search result navigation">
+                <button class="scp-ctx-search-nav-btn" id="scp-ctx-search-prev" type="button" title="Previous result (Shift+Enter)" aria-label="Previous result">&lt;</button>
+                <button class="scp-ctx-search-nav-btn" id="scp-ctx-search-next" type="button" title="Next result (Enter)" aria-label="Next result">&gt;</button>
+            </div>
             <button class="scp-action-btn" id="scp-ctx-copy-btn">${I.copy}<span>Copy</span></button>
         </div>
     </div>
