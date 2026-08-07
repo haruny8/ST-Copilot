@@ -98,6 +98,126 @@ export function _updateDirtyDots() {
 }
 
 
+let _contextSearchMatchIndex = -1;
+
+function _updateContextSearchCount(total = 0) {
+    const count = document.getElementById('scp-ctx-search-count');
+    const previous = document.getElementById('scp-ctx-search-prev');
+    const next = document.getElementById('scp-ctx-search-next');
+    const hasMatches = total > 0;
+    if (count) count.textContent = hasMatches ? `${_contextSearchMatchIndex + 1} of ${total}` : '';
+    [previous, next].forEach(button => {
+        if (button) button.disabled = !hasMatches;
+    });
+}
+
+function _clearContextSearchHighlights(container) {
+    if (!container) return;
+    container.querySelectorAll('.scp-ctx-search-match').forEach(match => match.replaceWith(document.createTextNode(match.textContent)));
+    container.normalize();
+}
+
+function _highlightContextSearchMatches(container, query) {
+    if (!container || !query) return [];
+    const queryLower = query.toLocaleLowerCase();
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+        acceptNode(node) {
+            return node.parentElement?.closest('.scp-ctx-search-match') || !node.nodeValue.trim()
+                ? NodeFilter.FILTER_REJECT
+                : NodeFilter.FILTER_ACCEPT;
+        },
+    });
+    const textNodes = [];
+    while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+    const matches = [];
+    for (const node of textNodes) {
+        const text = node.nodeValue;
+        const textLower = text.toLocaleLowerCase();
+        let offset = 0;
+        let matchIndex = textLower.indexOf(queryLower, offset);
+        if (matchIndex < 0) continue;
+
+        const fragment = document.createDocumentFragment();
+        while (matchIndex >= 0) {
+            if (matchIndex > offset) fragment.append(document.createTextNode(text.slice(offset, matchIndex)));
+            const match = document.createElement('mark');
+            match.className = 'scp-ctx-search-match';
+            match.textContent = text.slice(matchIndex, matchIndex + query.length);
+            fragment.append(match);
+            matches.push(match);
+            offset = matchIndex + query.length;
+            matchIndex = textLower.indexOf(queryLower, offset);
+        }
+        if (offset < text.length) fragment.append(document.createTextNode(text.slice(offset)));
+        node.replaceWith(fragment);
+    }
+    return matches;
+}
+
+export function refreshContextSearch({ focusCurrent = false } = {}) {
+    const input = document.getElementById('scp-ctx-search-input');
+    const query = input?.value.trim() || '';
+    const activeTab = document.querySelector('.scp-modal-tab.active')?.dataset.tab;
+    const container = activeTab === 'json'
+        ? document.getElementById('scp-ctx-json')
+        : document.getElementById('scp-ctx-body');
+    const formattedContainer = document.getElementById('scp-ctx-body');
+    const jsonContainer = document.getElementById('scp-ctx-json');
+
+    _clearContextSearchHighlights(formattedContainer);
+    _clearContextSearchHighlights(jsonContainer);
+    _contextSearchMatchIndex = -1;
+    if (!query || !container) {
+        _updateContextSearchCount();
+        return;
+    }
+
+    const matches = _highlightContextSearchMatches(container, query);
+    if (matches.length) {
+        _contextSearchMatchIndex = 0;
+        matches[0].classList.add('scp-ctx-search-match-active');
+        if (focusCurrent) matches[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+    _updateContextSearchCount(matches.length);
+}
+
+export function moveContextSearchMatch(direction) {
+    const activeTab = document.querySelector('.scp-modal-tab.active')?.dataset.tab;
+    const container = activeTab === 'json'
+        ? document.getElementById('scp-ctx-json')
+        : document.getElementById('scp-ctx-body');
+    const matches = Array.from(container?.querySelectorAll('.scp-ctx-search-match') || []);
+    if (!matches.length) return;
+
+    matches.forEach(match => match.classList.remove('scp-ctx-search-match-active'));
+    _contextSearchMatchIndex = (_contextSearchMatchIndex + direction + matches.length) % matches.length;
+    const match = matches[_contextSearchMatchIndex];
+    match.classList.add('scp-ctx-search-match-active');
+    match.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    _updateContextSearchCount(matches.length);
+}
+
+export function setupContextSearch() {
+    const input = document.getElementById('scp-ctx-search-input');
+    if (!input || input.dataset.bound === 'true') return;
+    input.dataset.bound = 'true';
+    input.addEventListener('input', () => refreshContextSearch({ focusCurrent: true }));
+    input.addEventListener('keydown', event => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        moveContextSearchMatch(event.shiftKey ? -1 : 1);
+    });
+    document.getElementById('scp-ctx-search-prev')?.addEventListener('click', () => moveContextSearchMatch(-1));
+    document.getElementById('scp-ctx-search-next')?.addEventListener('click', () => moveContextSearchMatch(1));
+}
+
+export function resetContextSearch() {
+    const input = document.getElementById('scp-ctx-search-input');
+    if (input) input.value = '';
+    refreshContextSearch();
+}
+
 // ─── Completion Sound ────────────────────────────────────────────────────────
 
 const _SOUND_PRESETS = {
@@ -405,9 +525,6 @@ export async function openInspector() {
 
     const fmtEl = $('scp-ctx-formatted'); const jsonEl = $('scp-ctx-json');
 
-    const modal = getModalEl()?.querySelector('.scp-modal');
-    if (modal) modal.style.height = '75vh';
-
     const modalBody = getModalEl()?.querySelector('.scp-modal-body');
     if (modalBody) {
         modalBody.style.padding = '0';
@@ -415,6 +532,7 @@ export async function openInspector() {
         modalBody.style.display = 'flex';
         modalBody.style.flexDirection = 'column';
         modalBody.style.height = '100%';
+        modalBody.style.minHeight = '0';
     }
 
     if (fmtEl) {
@@ -422,22 +540,32 @@ export async function openInspector() {
         fmtEl.style.flex = '1';
         fmtEl.style.overflow = 'hidden';
         fmtEl.style.padding = '0';
+        fmtEl.style.minHeight = '0';
         fmtEl.innerHTML = buildContextInspectorHTML(messages);
 
 fmtEl.querySelectorAll('.scp-ctx-nav-btn[data-t]').forEach(btn => {
-btn.addEventListener('click', () => {
-const targetId = btn.dataset.t;
-const bodyContainer = document.getElementById('scp-ctx-body');
-if (!bodyContainer) return;
-const t = bodyContainer.querySelector('#' + CSS.escape(targetId));
-if (!t) { console.warn('[ST-Copilot] Nav target not found:', targetId); return; }
-const tRect = t.getBoundingClientRect();
-const cRect = bodyContainer.getBoundingClientRect();
-bodyContainer.scrollTo({ top: bodyContainer.scrollTop + tRect.top - cRect.top, behavior: 'smooth' });
-});
+    btn.addEventListener('click', () => {
+        fmtEl.querySelectorAll('.scp-ctx-nav-btn').forEach(b => b.classList.remove('scp-ctx-nav-active'));
+        btn.classList.add('scp-ctx-nav-active');
+        const targetId = btn.dataset.t;
+        const bodyContainer = document.getElementById('scp-ctx-body');
+        if (!bodyContainer) return;
+        const t = bodyContainer.querySelector('#' + CSS.escape(targetId));
+        if (!t) { console.warn('[ST-Copilot] Nav target not found:', targetId); return; }
+        const tRect = t.getBoundingClientRect();
+        const cRect = bodyContainer.getBoundingClientRect();
+        bodyContainer.scrollTo({ top: bodyContainer.scrollTop + tRect.top - cRect.top, behavior: 'smooth' });
+    });
 });
     }
-    if (jsonEl) jsonEl.textContent = JSON.stringify(messages, null, 2);
+    if (jsonEl) {
+        jsonEl.style.flex = '1';
+        jsonEl.style.minHeight = '0';
+        jsonEl.style.overflow = 'auto';
+        jsonEl.textContent = JSON.stringify(messages, null, 2);
+    }
+    setupContextSearch();
+    resetContextSearch();
     getModalEl().style.display = 'flex';
 
     setTimeout(() => {

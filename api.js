@@ -33,7 +33,7 @@ import { EXT_DISPLAY } from './constants.js';
 import { DEFAULT_SYSTEM_PROMPT } from './default-prompts.js';
 import { escHtml } from './utils/util-dom.js';
 import { getUserPersona } from './utils/util-st.js';
-import { getCurrentSession } from './session.js';
+import { getCurrentSession, parseChatPickKey } from './session.js';
 import { applyRegexIfEnabled, buildLorebookContextBlock, buildLBAIInstructions } from './features/feature-lorebook-engine.js';
 import { buildCharacterContextBlock, buildCharEditAIInstructions, buildChatEditAIInstructions } from './features/feature-character-engine.js';
 import { mergeContent } from './features/feature-attachments.js';
@@ -127,46 +127,54 @@ export function getSystemPromptText() {
     return ctx.systemPrompt || ctx.system_prompt || '';
 }
 
+export function getMainChatMessageEntries(message, chatIndex, includeInlineSummaryOriginals = false) {
+    const ctx = SillyTavern.getContext();
+    const extractData = (source, inlineSummarySourcePath = null) => ({
+        role: source.is_user ? 'user' : 'assistant',
+        name: source.is_user ? (ctx.name1 || 'User') : (source.name || getCharInfo()?.name || 'Character'),
+        content: typeof source.mes === 'string' ? source.mes : '',
+        chatIndex,
+        inlineSummarySourcePath,
+        is_hidden: !!source.is_system || !!source.is_hidden || !!(source.extra && source.extra.is_hidden)
+    });
+    const inlineSummaryApi = Reflect.get(globalThis, 'InlineSummary');
+    if (!includeInlineSummaryOriginals || inlineSummaryApi?.version !== 1 || typeof inlineSummaryApi.getOriginalMessages !== 'function') {
+        return [extractData(message)];
+    }
+    const originals = inlineSummaryApi.getOriginalMessages(message, { recursive: true });
+    if (!Array.isArray(originals) || originals.length === 0) return [extractData(message)];
+    return originals.map(original => extractData(original, original.ilsSourcePath));
+}
+
 export function getMainChatSlice(depth, includeInlineSummaryOriginals = false) {
     const ctx = SillyTavern.getContext();
     if (!ctx.chat) return [];
-    
-    const extractData = (m, i, inlineSummarySourcePath = null) => ({
-        role: m.is_user ? 'user' : 'assistant',
-        name: m.is_user ? (ctx.name1 || 'User') : (m.name || getCharInfo()?.name || 'Character'),
-        content: typeof m.mes === 'string' ? m.mes : '',
-        chatIndex: i,
-        inlineSummarySourcePath,
-        is_hidden: !!m.is_system || !!m.is_hidden || !!(m.extra && m.extra.is_hidden)
-    });
-
-    const extractVisibleMessage = (message, chatIndex) => {
-        const inlineSummaryApi = Reflect.get(globalThis, 'InlineSummary');
-        if (!includeInlineSummaryOriginals || inlineSummaryApi?.version !== 1 || typeof inlineSummaryApi.getOriginalMessages !== 'function') {
-            return [extractData(message, chatIndex)];
-        }
-
-        const originals = inlineSummaryApi.getOriginalMessages(message, { recursive: true });
-        if (!Array.isArray(originals) || originals.length === 0) {
-            return [extractData(message, chatIndex)];
-        }
-
-        return originals.map(original => extractData(original, chatIndex, original.ilsSourcePath));
-    };
 
     try {
         const sess = getCurrentSession();
         const picked = sess.pickedChatIndices;
         if (picked && picked.length > 0) {
-            return picked
-                .filter(i => i >= 0 && i < ctx.chat.length)
-                .flatMap(i => extractVisibleMessage(ctx.chat[i], i));
+            const selected = [];
+            for (const key of picked) {
+                const parsed = parseChatPickKey(key);
+                if (!parsed || parsed.chatIndex < 0 || parsed.chatIndex >= ctx.chat.length) continue;
+                const expanded = getMainChatMessageEntries(ctx.chat[parsed.chatIndex], parsed.chatIndex, includeInlineSummaryOriginals);
+                if (!parsed.inlineSummarySourcePath) {
+                    selected.push(...expanded);
+                    continue;
+                }
+                const sourcePath = parsed.inlineSummarySourcePath.join('.');
+                const original = expanded.find(message => message.inlineSummarySourcePath?.join('.') === sourcePath);
+                if (original) selected.push(original);
+            }
+            return selected;
         }
     } catch(_) {}
     
     if (depth === 0) return [];
     const total = ctx.chat.length;
-    return ctx.chat.slice(-depth).flatMap((m, i) => extractVisibleMessage(m, total - depth + i));
+    return ctx.chat.slice(-depth).flatMap((message, index) =>
+        getMainChatMessageEntries(message, total - depth + index, includeInlineSummaryOriginals));
 }
 export async function buildSystemContent(settings) {
     const parts = [settings.systemPrompt || DEFAULT_SYSTEM_PROMPT];
@@ -207,6 +215,25 @@ export async function buildSystemContent(settings) {
     return parts.join('\n');
 }
 
+function buildPlotTrackerContextBlock(settings) {
+    if (!settings.includePlotTrackerContext) return '';
+    try {
+        const snapshot = globalThis.PlotTracker?.getContextSnapshot?.();
+        if (!snapshot || snapshot.schema !== 3) return '';
+        const plots = [...(snapshot.active || []), ...(snapshot.horizon || [])]
+            .filter((plot) => plot.title || plot.summary);
+        if (!plots.length) return '';
+        const lines = plots.map((plot) => {
+            const title = String(plot.title || '').replace(/[\r\n]+/g, ' ').trim();
+            const summary = String(plot.summary || '').replace(/[\r\n]+/g, ' ').trim();
+            return `- ${title}: ${summary}`;
+        });
+        return `<plot_tracker>\nThese are active and future plot threads manually maintained by the human user. Use these as reference regarding the current story, but still infer to the <roleplay_context> for full accuracy checks.\n\n${lines.join('\n')}\n</plot_tracker>`;
+    } catch (_) {
+        return '';
+    }
+}
+
 export function _buildAiContextForHistoryMsg(msg) {
     try {
         const lines = msg.swipes?.[msg.swipeIndex || 0]?.historyLines || msg.appliedLines || [];
@@ -227,7 +254,7 @@ export function _buildAiContextForHistoryMsg(msg) {
             entries,
         };
         const jsonStr = JSON.stringify(obj, null, 2);
-        return `${jsonStr}\n\n[System Note: Your generated \`${ctg}\` code block has been deleted to save tokens. This notification indicates the user's decision regarding your proposed changes. DO NOT regenerate it. Proceed with user's next request.]`;
+        return `${jsonStr}\n\n[System Note: Your proposed \`${ctg}\` code block was successfully delivered and reviewed by the user (see status above). The code block has now been deleted to save tokens. DO NOT resend it. Proceed with user's next request.]`;
     } catch (_) {
         return msg.content || '';
     }
@@ -235,6 +262,10 @@ export function _buildAiContextForHistoryMsg(msg) {
 
 export async function assembleMessages(session, settings, pendingUserText, pendingAtts = null) {
     const messages = [{ role: 'system', content: await buildSystemContent(settings) }];
+    const plotTrackerBlock = buildPlotTrackerContextBlock(settings);
+    if (plotTrackerBlock) {
+        messages.push({ role: 'user', content: plotTrackerBlock });
+    }
     const depth = Math.max(0, parseInt(settings.contextDepth) || 0);
     const hasPicked = !!(session.pickedChatIndices && session.pickedChatIndices.length > 0);
     if (depth > 0 || hasPicked) {
@@ -242,7 +273,10 @@ export async function assembleMessages(session, settings, pendingUserText, pendi
         if (slice.length) {
             const chatTotal = SillyTavern.getContext().chat?.length ?? 0;
             const visibleContextCount = hasPicked
-                ? session.pickedChatIndices.filter(i => i >= 0 && i < chatTotal).length
+                ? session.pickedChatIndices.filter(key => {
+                    const parsed = parseChatPickKey(key);
+                    return parsed && parsed.chatIndex >= 0 && parsed.chatIndex < chatTotal;
+                }).length
                 : Math.min(depth, chatTotal);
             const processedSlice = await Promise.all(slice.map(async m => ({
                 ...m, content: await applyRegexIfEnabled(m.content, m.role === 'user', chatTotal - m.chatIndex - 1),
@@ -363,7 +397,7 @@ const _CTX_SECTION_LABELS = {
 // top-level nav entry.
 const _CTX_MODULE_KEYS = new Set(['lorebook_management', 'character_management', 'chat_messages_editing']);
 
-export function _highlightContextText(raw) {
+export function _highlightContextText(raw, anchorKeys = null) {
     const events = [];
     // NOTE: the code-block group intentionally does NOT fall back to end-of-
     // string (no |$ alternative). If a ``` is never closed (e.g. the prompt
@@ -373,7 +407,7 @@ export function _highlightContextText(raw) {
     // the tokenizer so their nav anchors are never inserted. Requiring a
     // real closing ``` means unclosed fences simply don't match, and the
     // tags that follow them are tokenized correctly.
-    const masterRe = /(```[\s\S]*?```)|(`[^`\n]*`)|(<\/?[^\s<>][^>]*>|<!--[\s\S]*?-->)|(\{\{[^}\n]+\}\})/gi;
+    const masterRe = /(```[\s\S]*?```)|(`[^`\n]*`)|(<\/?[A-Za-z_][A-Za-z0-9_.:-]*(?:\s[^<>]*)?>|<!--[\s\S]*?-->)|(\{\{[^}\n]+\}\})/gi;
 
     let m;
     masterRe.lastIndex = 0;
@@ -457,9 +491,9 @@ lastOpenIndex.set(key, start);
             }
 
             const openTag = match.match(/^<([^\s>]+)>$/);
-            if (openTag && _ctxIsKnownTag(openTag[1])) {
+            if (anchorKeys !== false && openTag && _ctxIsKnownTag(openTag[1])) {
                 const key = _ctxSectionKey(openTag[1]);
-                if (start === lastOpenIndex.get(key)) {
+                if ((!anchorKeys || anchorKeys.has(key)) && start === lastOpenIndex.get(key)) {
                     html += `<span id="scp-ctx-sec-${escHtml(key)}" class="scp-ctx-anchor"></span>`;
                 }
             }
@@ -477,6 +511,47 @@ lastOpenIndex.set(key, start);
     return html;
 }
 
+function _buildSystemInspectorBlocks(raw, blockId) {
+    const sections = [
+        { key: 'character_information', label: 'Character', className: 'character', pattern: /^<character_information>\r?$/m },
+        { key: 'user_persona', label: 'User Persona', className: 'persona', pattern: /^<[^\s<>]+_persona>\r?$/m },
+        { key: 'lorebook_context', label: 'Lorebook', className: 'lorebook', pattern: /^<lorebook_context>\r?$/m },
+        { key: 'character_management', label: 'Character Card AI Edits', className: 'module', pattern: /^<character_management>\r?$/m },
+        { key: 'lorebook_management', label: 'Lorebook AI Edits', className: 'module', pattern: /^<lorebook_management>\r?$/m },
+        { key: 'chat_messages_editing', label: 'Chat Message AI Edits', className: 'module', pattern: /^<chat_messages_editing>\r?$/m },
+    ];
+    const boundaries = sections.map(section => {
+        const match = section.pattern.exec(raw);
+        return match ? { ...section, index: match.index } : null;
+    }).filter(Boolean).sort((left, right) => left.index - right.index);
+
+    const firstModule = boundaries.find(section => section.className === 'module');
+    if (firstModule) {
+        const moduleWrappers = Array.from(raw.matchAll(/^<modules>\r?$/gm));
+        for (let index = moduleWrappers.length - 1; index >= 0; index--) {
+            if (moduleWrappers[index].index >= firstModule.index) continue;
+            firstModule.index = moduleWrappers[index].index;
+            break;
+        }
+    }
+
+    const allSections = [{ label: 'System Prompt', className: 'system-prompt', index: 0, id: blockId }, ...boundaries.map(section => ({
+        ...section,
+        id: `scp-ctx-sec-${section.key}`,
+    }))];
+
+    return allSections.map((section, index) => {
+        const nextSection = allSections[index + 1];
+        const content = raw.slice(section.index, nextSection?.index).trim();
+        if (!content) return '';
+        return `<article class="scp-ctx-block scp-ctx-timeline-item scp-ctx-section-${section.className}" id="${section.id}">` +
+            `<span class="scp-ctx-timeline-dot" aria-hidden="true"></span>` +
+            `<div class="scp-ctx-block-header">${escHtml(section.label)}</div>` +
+            `<div class="scp-ctx-block-body"><pre class="scp-ctx-pre">${_highlightContextText(content, _CTX_MODULE_KEYS)}</pre></div>` +
+            `</article>`;
+    }).join('');
+}
+
 export function buildContextInspectorHTML(messages) {
     let navHtml = '', bodyHtml = '';
     let seenSections = new Set();
@@ -491,23 +566,26 @@ export function buildContextInspectorHTML(messages) {
             displayRole = 'system';
         }
 
-const LABELS = { system: '■ SYSTEM', user: '▶ USER', assistant: '◀ ASSISTANT' };
+const LABELS = { system: 'System', user: 'User', assistant: 'Assistant' };
 let label = (LABELS[displayRole] || displayRole) + (idx > 0? ` #${idx}`: '');
-// If this is a user message that contains roleplay_context, label it properly
-if (displayRole === 'user' && raw.includes('<roleplay_context')) {
+// Context messages can mention other tag names in their instructions, so
+// classify only structural opening tags that begin a line.
+if (displayRole === 'user' && /^<plot_tracker>\r?$/m.test(raw)) {
+label = 'Plot Tracker' + (idx > 0? ` #${idx}`: '');
+} else if (displayRole === 'user' && /^<roleplay_context(?:\s[^>]*)?>\r?$/m.test(raw)) {
 const pickedMatch = raw.match(/picked_messages="(\d+)"/);
 const lastMatch = raw.match(/last_messages="(\d+)"/);
 const msgCount = pickedMatch? pickedMatch[1]: (lastMatch? lastMatch[1]: '');
-label = '▶ Roleplay Context' + (msgCount? ` (${msgCount} msgs)`: '') + (idx > 0? ` #${idx}`: '');
+label = 'Roleplay Context' + (msgCount? ` (${msgCount} msgs)`: '') + (idx > 0? ` #${idx}`: '');
 }
         const blockId = `scp-ctx-b${idx}`;
 
-        navHtml += `<button class="scp-ctx-nav-btn scp-ctx-nav-${displayRole}" data-t="${blockId}">${escHtml(label)}</button>`;
+        if (msg.role !== 'system') {
+            navHtml += `<button class="scp-ctx-nav-btn scp-ctx-nav-${displayRole}" data-t="${blockId}">${escHtml(label)}</button>`;
+        }
 
         if (msg.role === 'system') {
-            // This fork doesn't wrap the system prompt itself in its own
-            // tag, so "System Prompt" just points at the top of the block.
-            navHtml += `<button class="scp-ctx-nav-btn scp-ctx-nav-sub" data-t="${blockId}">&nbsp;&nbsp;◦ System Prompt</button>`;
+            navHtml += `<button class="scp-ctx-nav-btn scp-ctx-nav-sub scp-ctx-nav-section-system-prompt" data-t="${blockId}">System Prompt</button>`;
 
             const tagRe = /<([^\s<>]+)>/g;
             let tm;
@@ -537,34 +615,36 @@ label = '▶ Roleplay Context' + (msgCount? ` (${msgCount} msgs)`: '') + (idx > 
                     const secId = `scp-ctx-sec-${key}`;
 
                 if (_CTX_MODULE_KEYS.has(key)) {
-                    moduleNavs += `<button class="scp-ctx-nav-btn scp-ctx-nav-sub" data-t="${secId}">&nbsp;&nbsp;◦ ${escHtml(secLabel)}</button>`;
+                    moduleNavs += `<button class="scp-ctx-nav-btn scp-ctx-nav-sub scp-ctx-nav-module-item" data-t="${secId}">${escHtml(secLabel)}</button>`;
                 } else {
-                    navHtml += `<button class="scp-ctx-nav-btn scp-ctx-nav-sub" data-t="${secId}">&nbsp;&nbsp;◦ ${escHtml(secLabel)}</button>`;
+                    navHtml += `<button class="scp-ctx-nav-btn scp-ctx-nav-sub scp-ctx-nav-section-${key}" data-t="${secId}">${escHtml(secLabel)}</button>`;
                 }
                 }
             if (moduleNavs) {
-                navHtml += `<details class="scp-ctx-nav-details" open><summary class="scp-ctx-nav-btn" style="color:var(--scp-text)">▼ Modules</summary>${moduleNavs}</details>`;
+                navHtml += `<details class="scp-ctx-nav-details" open><summary class="scp-ctx-nav-btn scp-ctx-nav-modules">Modules</summary>${moduleNavs}</details>`;
             }
         }
 
-        const highlighted = _highlightContextText(raw);
-        bodyHtml += `<div class="scp-ctx-block" id="${blockId}">`;
-        bodyHtml += `<div class="scp-ctx-block-header scp-ctx-role-${displayRole}">${escHtml(label)}</div>`;
-        bodyHtml += `<div class="scp-ctx-block-sep"></div>`;
-        bodyHtml += `<div class="scp-ctx-block-body"><pre class="scp-ctx-pre">${highlighted}</pre></div>`;
-        bodyHtml += `</div>`;
+        if (msg.role === 'system') {
+            bodyHtml += _buildSystemInspectorBlocks(raw, blockId);
+        } else {
+            const highlighted = _highlightContextText(raw);
+            bodyHtml += `<article class="scp-ctx-block scp-ctx-timeline-item scp-ctx-role-${displayRole}" id="${blockId}">`;
+            bodyHtml += `<span class="scp-ctx-timeline-dot" aria-hidden="true"></span>`;
+            bodyHtml += `<div class="scp-ctx-block-header">${escHtml(label)}</div>`;
+            bodyHtml += `<div class="scp-ctx-block-body"><pre class="scp-ctx-pre">${highlighted}</pre></div>`;
+            bodyHtml += `</article>`;
+        }
     });
 
     const styleHtml = `<style>
-        .scp-ctx-hl-tag-d0 { color: #eff6ff !important; }
-        .scp-ctx-hl-tag-d1 { color: #bfdbfe !important; }
-        .scp-ctx-hl-tag-d2 { color: #93c5fd !important; }
-        .scp-ctx-hl-tag-d3 { color: rgb(106, 165, 236) !important; }
-        .scp-ctx-hl-tag-d4 { color: rgb(100, 158, 253) !important; }
-        .scp-ctx-hl-tag-d5 { color: rgb(74, 120, 221) !important; }
+        .scp-ctx-hl-tag-d0, .scp-ctx-hl-tag-d1, .scp-ctx-hl-tag-d2,
+        .scp-ctx-hl-tag-d3, .scp-ctx-hl-tag-d4, .scp-ctx-hl-tag-d5 {
+            color: #71b7fb !important;
+        }
     </style>`;
 
-    return `<div class="scp-ctx-inspector">${styleHtml}<nav class="scp-ctx-nav">${navHtml}</nav><div class="scp-ctx-body" id="scp-ctx-body">${bodyHtml}</div></div>`;
+    return `<div class="scp-ctx-inspector">${styleHtml}<nav class="scp-ctx-nav"><div class="scp-ctx-nav-title">Timeline</div>${navHtml}</nav><div class="scp-ctx-body" id="scp-ctx-body">${bodyHtml}</div></div>`;
 }
 let _abortController = null;
 

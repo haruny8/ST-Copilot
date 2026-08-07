@@ -70,6 +70,7 @@ import {
     restoreWindowState, updateIconVisibility, _takeProfileSnapshot,
     updateProfilesList, _setupAttachButton, updateCharBadge, autoLoadBoundProfile,
     toggleVisibility, playCompletionSound, applyCustomTheme, openInspector,
+    refreshContextSearch,
     setForwardDeps as setUiWindowForwardDeps,
 } from './ui/ui-window.js';
 import {
@@ -379,6 +380,7 @@ function attachWindowListeners() {
 
             if (fmtEl) fmtEl.style.display = isFormatted ? '' : 'none';
             if (jsonEl) jsonEl.style.display = isJson ? '' : 'none';
+            refreshContextSearch();
 
             setTimeout(() => {
                 const targetEl = isJson ? jsonEl : document.getElementById('scp-ctx-body');

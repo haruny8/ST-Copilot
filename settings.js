@@ -38,6 +38,7 @@ export function getSettings() {
         includeAuthorsNote: true,
         includeCharacterCard: true,
         includeUserPersonality: true,
+        includePlotTrackerContext: false,
         systemPrompt: DEFAULT_SYSTEM_PROMPT,
         profiles: {},
         activeProfile: '',

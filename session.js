@@ -321,6 +321,24 @@ export function deleteMsg(session, msgId) {
     if (idx !== -1) { session.messages.splice(idx, 1); saveSessionsToMetadata(); }
 }
 
+const INLINE_SUMMARY_PICK_PREFIX = 'ils:';
+
+export function makeChatPickKey(chatIndex, inlineSummarySourcePath = null) {
+    if (!inlineSummarySourcePath) return chatIndex;
+    return `${INLINE_SUMMARY_PICK_PREFIX}${chatIndex}:${inlineSummarySourcePath.join('.')}`;
+}
+
+export function parseChatPickKey(key) {
+    if (Number.isInteger(key)) return { chatIndex: key, inlineSummarySourcePath: null };
+    if (typeof key !== 'string' || !key.startsWith(INLINE_SUMMARY_PICK_PREFIX)) return null;
+    const match = key.match(/^ils:(\d+):(\d+(?:\.\d+)*)$/);
+    if (!match) return null;
+    return {
+        chatIndex: Number(match[1]),
+        inlineSummarySourcePath: match[2].split('.').map(Number),
+    };
+}
+
 export function truncateFrom(session, msgId) {
     const idx = session.messages.findIndex(m => m.id === msgId);
     if (idx !== -1) { session.messages.splice(idx); saveSessionsToMetadata(); }

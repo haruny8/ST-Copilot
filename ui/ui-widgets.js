@@ -61,12 +61,13 @@ import { EXT_DISPLAY, ICONS, THEME_PRESETS } from '../constants.js';
 import { getSettings, saveSettings } from '../settings.js';
 import {
     commitBucketChanges, genId, getChatBucket, getCurrentSession, loadSessionFile,
-    saveSessionFile, saveSessionsToMetadata, setActiveSession, updateDepthSlidersMax,
+    getEffectiveSettings, makeChatPickKey, parseChatPickKey, saveSessionFile,
+    saveSessionsToMetadata, setActiveSession, updateDepthSlidersMax,
 } from '../session.js';
 import { $, autoResize, escHtml, showCustomDialog } from '../utils/util-dom.js';
 import { getBindingKey } from '../utils/util-st.js';
 import { recordStat, STAT } from '../features/feature-stats.js';
-import { getCharInfo } from '../api.js';
+import { getCharInfo, getMainChatMessageEntries } from '../api.js';
 import { renderSession, updateMsgCount } from './ui-chat.js';
 import { syncOverlayUI } from './ui-settings.js';
 import { applyCustomTheme } from './ui-window.js';
@@ -636,7 +637,12 @@ function getPickedChatIndices() {
 function setPickedChatIndices(indices) {
     try {
         const sess = getCurrentSession();
-        sess.pickedChatIndices = [...indices].sort((a, b) => a - b);
+        sess.pickedChatIndices = [...indices].sort((a, b) => {
+            const aParsed = parseChatPickKey(a);
+            const bParsed = parseChatPickKey(b);
+            return (aParsed?.chatIndex ?? 0) - (bParsed?.chatIndex ?? 0)
+                || String(a).localeCompare(String(b), undefined, { numeric: true });
+        });
         saveSessionsToMetadata();
         updatePickBtnState();
         updateMsgCount(sess);
@@ -677,6 +683,21 @@ function renderPickerMessages() {
     const msgs = ctx.chat || [];
     const pickedSet = new Set(getPickedChatIndices());
     const charInfo = getCharInfo();
+    const includeOriginals = !!getEffectiveSettings().includeInlineSummaryOriginals;
+    const pickerMessages = msgs.flatMap((msg, idx) => {
+        if (!includeOriginals) return [{ ...msg, chatIndex: idx, pickKey: idx, sourcePath: null }];
+        const expanded = getMainChatMessageEntries(msg, idx, true);
+        if (!expanded.length) return [{ ...msg, chatIndex: idx, pickKey: idx, sourcePath: null }];
+        return expanded.map(message => ({
+            ...msg,
+            is_user: message.role === 'user',
+            name: message.name,
+            mes: message.content,
+            chatIndex: idx,
+            pickKey: makeChatPickKey(idx, message.inlineSummarySourcePath),
+            sourcePath: message.inlineSummarySourcePath,
+        }));
+    });
 
     body.innerHTML = '';
     if (!msgs.length) {
@@ -686,13 +707,15 @@ function renderPickerMessages() {
     }
 
     const frag = document.createDocumentFragment();
-    msgs.forEach((msg, idx) => {
+    pickerMessages.forEach((msg, idx) => {
         const isUser = msg.is_user;
         const name = isUser ? (ctx.name1 || 'User') : (msg.name || charInfo?.name || 'Character');
-        const isSelected = pickedSet.has(idx);
+        const isSelected = pickedSet.has(msg.pickKey)
+            || (msg.sourcePath && pickedSet.has(msg.chatIndex));
         const row = document.createElement('div');
         row.className = `scp-picker-row${isSelected ? ' selected' : ''}${isUser ? ' user' : ''}`;
         row.dataset.idx = idx;
+        row.dataset.pickKey = String(msg.pickKey);
 
         const cb = document.createElement('div');
         cb.className = `scp-picker-cb${isSelected ? ' checked' : ''}`;
@@ -702,7 +725,9 @@ function renderPickerMessages() {
 
         const idxEl = document.createElement('span');
         idxEl.className = 'scp-picker-idx';
-        idxEl.textContent = `#${idx}`;
+        idxEl.textContent = msg.sourcePath
+            ? `#${msg.chatIndex} original ${msg.sourcePath.join('.')}`
+            : `#${msg.chatIndex}`;
 
         const nameEl = document.createElement('span');
         nameEl.className = 'scp-picker-name';
@@ -741,14 +766,14 @@ function renderPickerMessages() {
 
         row.addEventListener('click', e => {
             const curIdx = parseInt(row.dataset.idx);
-            const curMsg = msgs[curIdx];
+            const curMsg = pickerMessages[curIdx];
 
             if (e.ctrlKey || e.metaKey) {
                 // Ctrl+click: toggle all messages by same sender
                 const targetState = !row.classList.contains('selected');
                 body.querySelectorAll('.scp-picker-row').forEach(r => {
                     const ri = parseInt(r.dataset.idx);
-                    const rm = msgs[ri];
+                    const rm = pickerMessages[ri];
                     if (rm && rm.is_user === curMsg.is_user && rm.name === curMsg.name) {
                         r.classList.toggle('selected', targetState);
                         r.querySelector('.scp-picker-cb')?.classList.toggle('checked', targetState);
@@ -759,7 +784,7 @@ function renderPickerMessages() {
                 const targetState = !row.classList.contains('selected');
                 body.querySelectorAll('.scp-picker-row').forEach(r => {
                     const ri = parseInt(r.dataset.idx);
-                    const rm = msgs[ri];
+                    const rm = pickerMessages[ri];
                     if (rm && !(rm.is_user === curMsg.is_user && rm.name === curMsg.name)) {
                         r.classList.toggle('selected', targetState);
                         r.querySelector('.scp-picker-cb')?.classList.toggle('checked', targetState);
@@ -836,7 +861,11 @@ export function setupChatPickerListeners() {
     document.getElementById('scp-picker-apply')?.addEventListener('click', () => {
         const rows = document.querySelectorAll('#scp-picker-body .scp-picker-row');
         const indices = [];
-        rows.forEach(r => { if (r.classList.contains('selected')) indices.push(parseInt(r.dataset.idx)); });
+        rows.forEach(r => {
+            if (!r.classList.contains('selected')) return;
+            const pickKey = r.dataset.pickKey;
+            indices.push(pickKey?.startsWith('ils:') ? pickKey : parseInt(pickKey));
+        });
         setPickedChatIndices(indices);
         closeChatPicker();
     });

@@ -35,6 +35,7 @@ import { DEFAULT_CHAR_EDIT_DIRECTIVE, DEFAULT_CHAT_EDIT_DIRECTIVE, CHAR_EDIT_FOR
 import { addHistoryToSwipe as _addHistoryToSwipe } from './feature-lorebook-engine.js';
 import { appendLBHistoryEl as _appendLBHistoryEl, openTextDiffModal as _openTextDiffModal } from './feature-chatedit-engine.js';
 import { renderMsgBodyContent as _renderMsgBodyContent } from '../ui/ui-chat.js';
+import { parseChatPickKey } from '../session.js';
 
 // Local shorthand alias for the ICONS constant (same pattern as
 // ui-widgets.js) — used by the proposal/creation card renderers below.
@@ -233,7 +234,9 @@ export function buildChatEditAIInstructions(settings) {
         const sess = getCurrentSession();
         const picked = sess.pickedChatIndices;
         if (picked && picked.length > 0) {
-            slice = picked.filter(i => i >= 0 && i < stMsgs.length);
+            slice = [...new Set(picked.map(parseChatPickKey)
+                .filter(key => key && key.chatIndex >= 0 && key.chatIndex < stMsgs.length)
+                .map(key => key.chatIndex))];
         } else {
             slice = depth > 0 ? stMsgs.slice(-depth).map((_, i) => stMsgs.length - depth + i) : [];
         }

@@ -38,6 +38,7 @@ import { applySearchReplaceToField } from './feature-character-engine.js';
 import { recordStat, STAT } from './feature-stats.js';
 import { renderLBHistoryContent as _renderLBHistoryContent, appendLBHistoryEl as _appendLBHistoryEl } from './feature-chatedit-engine.js';
 import { expandMacros as _expandMacros } from '../api.js';
+import { parseChatPickKey } from '../session.js';
 
 let _wiCache = {};
 let _wiPromises = {};
@@ -330,7 +331,9 @@ export async function buildLorebookContextBlock(settings) {
             const session = getCurrentSession();
             const picked = session.pickedChatIndices;
             if (picked && picked.length > 0) {
-                const pickedMsgs = picked.filter(i => i >= 0 && i < msgs.length).map(i => msgs[i]);
+                const pickedMsgs = [...new Set(picked.map(parseChatPickKey)
+                    .filter(key => key && key.chatIndex >= 0 && key.chatIndex < msgs.length)
+                    .map(key => key.chatIndex))].map(index => msgs[index]);
                 lastUser = pickedMsgs.filter(m => m.is_user).map(m => m.mes).join('\n');
                 lastChar = pickedMsgs.filter(m => !m.is_user).map(m => m.mes).join('\n');
             } else {
