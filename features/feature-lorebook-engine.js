@@ -150,11 +150,11 @@ export function getEmbeddedCharBook() {
 export async function saveWorldInfoBook(name, data) {
     if (data._embedded) { toastr.warning('Cannot save embedded character books directly.', EXT_DISPLAY); return; }
     const ctx = SillyTavern.getContext();
-    const payload = { ...data };
+    const payload = structuredClone(data);
     delete payload._ts;
     try {
         if (typeof ctx.saveWorldInfo === 'function') {
-            await ctx.saveWorldInfo(name, payload);
+            await ctx.saveWorldInfo(name, payload, true);
         } else {
             const res = await fetch('/api/worldinfo/edit', {
                 method: 'POST',
