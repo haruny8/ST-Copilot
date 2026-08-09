@@ -3911,15 +3911,7 @@ details.scp-reasoning-block[open] .scp-reasoning-summary::before { transform: ro
 }
 
 @media screen and (max-width: 600px) {
-    #scp-picker-overlay { padding: 0; }
-    #scp-picker-overlay .scp-picker-box {
-        border: 0;
-        border-radius: 0;
-        height: 100%;
-        max-height: none;
-        max-width: none;
-        width: 100%;
-    }
+    .scp-picker-box { max-height: 88dvh; max-height: 88vh; }
     .scp-picker-row { padding: 10px 10px; }
     .scp-picker-text { font-size: 13px; }
     .scp-picker-cb { width: 20px; height: 20px; }

@@ -357,6 +357,7 @@ export const SESSION_OVERRIDE_KEYS = [
     'contextDepth', 'localHistoryLimit', 'maxTokens',
     'connectionSource', 'connectionProfileId', 'systemPrompt',
     'includeSystemPrompt', 'includeUserPersonality', 'reasoningTrimStrings',
+    'includePlotTrackerContext',
     'applyRegexToContext', 'includeInlineSummaryOriginals', 'forceStreaming',
     'charEditAIEnabled', 'charEditPrompt', 'lorebookAIManageEnabled',
     'lorebookManagePrompt', 'chatEditAIEnabled', 'chatEditPrompt', 'altGreetingIndices',

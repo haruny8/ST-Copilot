@@ -219,7 +219,7 @@ function buildPlotTrackerContextBlock(settings) {
     if (!settings.includePlotTrackerContext) return '';
     try {
         const snapshot = globalThis.PlotTracker?.getContextSnapshot?.();
-        if (!snapshot || snapshot.schema !== 3) return '';
+        if (!snapshot || !Array.isArray(snapshot.active) || !Array.isArray(snapshot.horizon)) return '';
         const plots = [...(snapshot.active || []), ...(snapshot.horizon || [])]
             .filter((plot) => plot.title || plot.summary);
         if (!plots.length) return '';

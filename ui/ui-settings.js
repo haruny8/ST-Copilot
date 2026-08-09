@@ -562,6 +562,7 @@ export function setupSettingsHandlers() {
             localHistoryLimit: 50,
             connectionSource: 'default', connectionProfileId: '',
             maxTokens: 8200,
+            includePlotTrackerContext: false,
         };
         saveSettings(); refreshProfilesDropdown();
         loadProfile(n);
@@ -913,6 +914,7 @@ export function syncSPFromSettings() {
     
     gC('scp-sp-include-sysprompt', s.includeSystemPrompt);
     gC('scp-sp-include-persona', s.includeUserPersonality);
+    gC('scp-sp-include-plot-tracker', s.includePlotTrackerContext);
     gC('scp-sp-apply-regex', s.applyRegexToContext);
     gC('scp-sp-inline-summary-originals', s.includeInlineSummaryOriginals);
     g('scp-sp-reasoning-trim', s.reasoningTrimStrings);
@@ -966,6 +968,7 @@ export function syncSPFromSettings() {
 
     gC('scp-sp-ov-include-sysprompt', eff.includeSystemPrompt);
     gC('scp-sp-ov-include-persona', eff.includeUserPersonality);
+    gC('scp-sp-ov-include-plot-tracker', eff.includePlotTrackerContext);
     gC('scp-sp-ov-apply-regex', eff.applyRegexToContext);
     gC('scp-sp-ov-inline-summary-originals', eff.includeInlineSummaryOriginals);
 
@@ -1058,7 +1061,7 @@ export function refreshSPProfilesDropdown() {
     const sel = document.getElementById('scp-sp-profile-select'); if (!sel) return;
     const s = getSettings();
     if (!Object.keys(s.profiles).length) {
-        s.profiles['Default'] = { systemPrompt: DEFAULT_SYSTEM_PROMPT, includeSystemPrompt: true, includeAuthorsNote: true, includeCharacterCard: true, includeUserPersonality: true, contextDepth: 15, localHistoryLimit: 50, connectionSource: 'default', connectionProfileId: '', maxTokens: 8200, applyRegexToContext: true, includeInlineSummaryOriginals: false };
+        s.profiles['Default'] = { systemPrompt: DEFAULT_SYSTEM_PROMPT, includeSystemPrompt: true, includeAuthorsNote: true, includeCharacterCard: true, includeUserPersonality: true, contextDepth: 15, localHistoryLimit: 50, connectionSource: 'default', connectionProfileId: '', maxTokens: 8200, includePlotTrackerContext: false, applyRegexToContext: true, includeInlineSummaryOriginals: false };
         s.activeProfile = 'Default'; saveSettings();
     }
     sel.innerHTML = '';
@@ -1423,7 +1426,7 @@ export function setupSettingsPanelListeners() {
         const name = await showCustomDialog({ type: 'prompt', title: 'New Configuration', message: 'Name:', placeholder: 'New Config' });
         if (!name?.trim()) return;
         const n = name.trim(); const s = getSettings();
-        s.profiles[n] = { systemPrompt: DEFAULT_SYSTEM_PROMPT, includeSystemPrompt: true, includeAuthorsNote: true, includeCharacterCard: true, includeUserPersonality: true, contextDepth: 15, localHistoryLimit: 50, connectionSource: 'default', connectionProfileId: '', maxTokens: 8200, applyRegexToContext: true, includeInlineSummaryOriginals: false };
+        s.profiles[n] = { systemPrompt: DEFAULT_SYSTEM_PROMPT, includeSystemPrompt: true, includeAuthorsNote: true, includeCharacterCard: true, includeUserPersonality: true, contextDepth: 15, localHistoryLimit: 50, connectionSource: 'default', connectionProfileId: '', maxTokens: 8200, includePlotTrackerContext: false, applyRegexToContext: true, includeInlineSummaryOriginals: false };
         saveSettings(); refreshSPProfilesDropdown(); refreshProfilesDropdown();
         loadProfile(n); syncSPFromSettings(); updateSettingsUI();
         const sel = document.getElementById('scp-sp-profile-select'); if (sel) sel.value = n;
@@ -1674,6 +1677,7 @@ export function setupSettingsPanelListeners() {
 
     bindOvCheck('scp-sp-ov-include-sysprompt', 'includeSystemPrompt');
     bindOvCheck('scp-sp-ov-include-persona', 'includeUserPersonality');
+    bindOvCheck('scp-sp-ov-include-plot-tracker', 'includePlotTrackerContext');
     bindOvCheck('scp-sp-ov-apply-regex', 'applyRegexToContext');
     bindOvCheck('scp-sp-ov-inline-summary-originals', 'includeInlineSummaryOriginals');
     bindOvCheck('scp-sp-ov-char-edit-enabled', 'charEditAIEnabled');
@@ -1725,6 +1729,7 @@ export function setupSettingsPanelListeners() {
                 connectionProfileId: ['scp-sp-ov-conn-profile'],
                 includeSystemPrompt: ['scp-sp-ov-include-sysprompt'],
                 includeUserPersonality: ['scp-sp-ov-include-persona'],
+                includePlotTrackerContext: ['scp-sp-ov-include-plot-tracker'],
                 applyRegexToContext: ['scp-sp-ov-apply-regex'],
                 includeInlineSummaryOriginals: ['scp-sp-ov-inline-summary-originals'],
                 charField_tags: ['scp-sp-ov-ce-tags'],
