@@ -220,15 +220,18 @@ function buildPlotTrackerContextBlock(settings) {
     try {
         const snapshot = globalThis.PlotTracker?.getContextSnapshot?.();
         if (!snapshot || !Array.isArray(snapshot.active) || !Array.isArray(snapshot.horizon)) return '';
-        const plots = [...(snapshot.active || []), ...(snapshot.horizon || [])]
-            .filter((plot) => plot.title || plot.summary);
-        if (!plots.length) return '';
-        const lines = plots.map((plot) => {
+        const formatPlots = (plots) => plots
+            .filter((plot) => plot.title || plot.summary)
+            .map((plot) => {
             const title = String(plot.title || '').replace(/[\r\n]+/g, ' ').trim();
             const summary = String(plot.summary || '').replace(/[\r\n]+/g, ' ').trim();
             return `- ${title}: ${summary}`;
         });
-        return `<plot_tracker>\nThese are active and future plot threads manually maintained by the human user. Use these as reference regarding the current story, but still infer to the <roleplay_context> for full accuracy checks.\n\n${lines.join('\n')}\n</plot_tracker>`;
+        const active = formatPlots(snapshot.active);
+        const horizon = formatPlots(snapshot.horizon);
+        const worldProgression = formatPlots(Array.isArray(snapshot.worldProgression) ? snapshot.worldProgression : []);
+        if (!active.length && !horizon.length && !worldProgression.length) return '';
+        return `<plot_tracker>\nThese are active plot threads, upcoming plot beats, and off-screen world progression manually maintained by the human user. Use these as reference regarding the current story, but still infer to the <roleplay_context> for full accuracy checks.\n\n**Active plot threads:**\n${active.join('\n') || '- None'}\n\n**Upcoming plot beats:**\n${horizon.join('\n') || '- None'}\n\n**Off-screen world progression:**\n${worldProgression.join('\n') || '- None'}\n</plot_tracker>`;
     } catch (_) {
         return '';
     }
