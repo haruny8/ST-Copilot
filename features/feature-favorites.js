@@ -21,6 +21,7 @@ import { escHtml } from '../utils/util-dom.js';
 import { getBindingKey } from '../utils/util-st.js';
 import { getSettings, saveSettings } from '../settings.js';
 import { getCurrentSession } from '../session.js';
+import { revealMessage } from '../ui/ui-chat.js';
 
 export function getSessionFavKey() {
     const { charId, chatId } = getBindingKey();
@@ -93,7 +94,7 @@ export function renderFavoritesPanel() {
         item.addEventListener('click', e => {
             if (e.target.classList.contains('scp-fav-item-remove')) return;
             closeFavoritesPanel();
-            const msgEl = document.querySelector(`.scp-msg[data-id="${msg.id}"]`);
+            const msgEl = revealMessage(msg.id);
             if (!msgEl) return;
             msgEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
             requestAnimationFrame(() => {

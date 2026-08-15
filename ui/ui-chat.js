@@ -894,6 +894,63 @@ export function renderMsgBodyContent(msgEl, msg) {
 }
 
 let _tokenCountCache = new Map();
+const DISPLAY_MESSAGE_BATCH_SIZE = 40;
+let _renderedMessageStartIndex = 0;
+
+function appendRenderedMessage(msg, beforeEl = null) {
+    const c = $('scp-messages');
+    if (!c) return;
+    if (msg.isLBHistory) {
+        appendLBHistoryEl(msg, null, beforeEl);
+        return;
+    }
+    const el = createMsgEl(msg, handleCopy, handleEdit, handleDelete, handleMessageRegen);
+    c.insertBefore(el, beforeEl);
+}
+
+function loadOlderMessageBatch(session, preserveScroll = true) {
+    const c = $('scp-messages');
+    const button = c?.querySelector('.scp-load-older-btn');
+    if (!c || !button || _renderedMessageStartIndex <= 0) return false;
+
+    const previousStart = _renderedMessageStartIndex;
+    const nextStart = Math.max(0, previousStart - DISPLAY_MESSAGE_BATCH_SIZE);
+    const previousHeight = c.scrollHeight;
+    const previousScrollTop = c.scrollTop;
+    for (const msg of session.messages.slice(nextStart, previousStart).reverse()) {
+        appendRenderedMessage(msg, button.nextElementSibling);
+    }
+    _renderedMessageStartIndex = nextStart;
+    if (_renderedMessageStartIndex > 0) {
+        button.textContent = `Load older messages (${_renderedMessageStartIndex})`;
+    } else {
+        button.remove();
+    }
+    if (preserveScroll) c.scrollTop = previousScrollTop + c.scrollHeight - previousHeight;
+    _refreshContinueBtns();
+    _refreshSwipeBars(session);
+    return true;
+}
+
+function renderLoadOlderButton(session) {
+    const c = $('scp-messages');
+    if (!c || _renderedMessageStartIndex <= 0) return null;
+    const button = document.createElement('button');
+    button.className = 'scp-load-older-btn';
+    button.type = 'button';
+    button.textContent = `Load older messages (${_renderedMessageStartIndex})`;
+    button.addEventListener('click', () => loadOlderMessageBatch(session));
+    c.appendChild(button);
+    return button;
+}
+
+export function revealMessage(msgId) {
+    const session = getCurrentSession();
+    const targetIndex = session.messages.findIndex(msg => msg.id === msgId);
+    if (targetIndex === -1) return null;
+    while (targetIndex < _renderedMessageStartIndex && loadOlderMessageBatch(session, false)) {}
+    return document.querySelector(`.scp-msg[data-id="${msgId}"]`);
+}
 
 export function _updateMsgTokenCount(msgEl, content, forceRecalc = false) {
     const el = msgEl.querySelector ? msgEl.querySelector('.scp-msg-token-count') : null;
@@ -930,18 +987,19 @@ export function renderSession(session) {
         updateMsgCount(session);
         return;
     }
-    for (const msg of session.messages) {
-        if (msg.isLBHistory) {
-            appendLBHistoryEl(msg);
-        } else {
-            const el = createMsgEl(msg, handleCopy, handleEdit, handleDelete, handleMessageRegen);
-            c.appendChild(el);
-        }
+    _renderedMessageStartIndex = Math.max(0, session.messages.length - DISPLAY_MESSAGE_BATCH_SIZE);
+    renderLoadOlderButton(session);
+    for (const msg of session.messages.slice(_renderedMessageStartIndex)) {
+        appendRenderedMessage(msg);
     }
     updateMsgCount(session);
     scrollToBottom();
     _refreshContinueBtns();
     _refreshSwipeBars(session);
+}
+
+export function resetRenderedHistory() {
+    renderSession(getCurrentSession());
 }
 
 export function appendMsgEl(msg) {

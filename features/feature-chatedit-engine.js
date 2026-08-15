@@ -296,7 +296,7 @@ export function renderLBHistoryContent(msg, contentEl) {
     }
 }
 
-export function appendLBHistoryEl(msg, afterMsgId = null) {
+export function appendLBHistoryEl(msg, afterMsgId = null, beforeEl = null) {
     const c = document.getElementById('scp-messages');
     if (!c) return;
     c.querySelector('.scp-empty-state')?.remove();
@@ -347,9 +347,10 @@ export function appendLBHistoryEl(msg, afterMsgId = null) {
         ? (c.querySelector(`.scp-lb-proposal-card[data-for="${afterMsgId}"]`) || c.querySelector(`.scp-msg[data-id="${afterMsgId}"]`))
         : null;
     if (anchor) anchor.after(wrap);
+    else if (beforeEl) c.insertBefore(wrap, beforeEl);
     else c.appendChild(wrap);
     _updateMsgCount(getCurrentSession());
-    if (!anchor) _scrollToBottom();
+    if (!anchor && !beforeEl) _scrollToBottom();
 }
 
 export function parseChatChangesFromText(text) {

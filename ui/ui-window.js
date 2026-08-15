@@ -57,7 +57,7 @@ import {
     getPendingAttachments, processAttachmentsBeforeSend, addAttachments, _fileToDataUrl,
 } from '../features/feature-attachments.js';
 import {
-    scrollToBottom, resetUserScrolledUp, isSearchOpen, openSearch,
+    scrollToBottom, resetUserScrolledUp, resetRenderedHistory, isSearchOpen, openSearch,
 } from '../ui/ui-chat.js';
 
 // ── Injected forward deps (see header note) ────────────────────────────────
@@ -1426,6 +1426,7 @@ export function hideWindow() {
     s.windowVisible = false; 
     s.minimized = false; 
     getWindowEl().style.display = 'none'; 
+    resetRenderedHistory();
     setCopilotActive(false);
     saveSettings(); 
     updateIconVisibility();
