@@ -3908,6 +3908,26 @@ details.scp-reasoning-block[open] .scp-reasoning-summary::before { transform: ro
     flex-shrink: 0;
 }
 
+.scp-picker-range-btn.active {
+    background: var(--scp-accent-bg) !important;
+    border-color: var(--scp-accent) !important;
+    color: var(--scp-accent) !important;
+}
+
+@media screen and (max-width: 768px) {
+    #scp-picker-overlay {
+        padding: 0 !important;
+    }
+    .scp-modal.scp-picker-box {
+        border: 0 !important;
+        border-radius: 0 !important;
+        height: 100dvh !important;
+        max-height: none !important;
+        max-width: none !important;
+        width: 100vw !important;
+    }
+}
+
 @media screen and (max-width: 520px) {
     .scp-picker-header {
         flex-direction: column;

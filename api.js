@@ -631,7 +631,10 @@ label = 'Roleplay Context' + (msgCount? ` (${msgCount} msgs)`: '') + (idx > 0? `
         if (msg.role === 'system') {
             bodyHtml += _buildSystemInspectorBlocks(raw, blockId);
         } else {
-            const highlighted = _highlightContextText(raw);
+            // Non-system messages navigate by their card id. Avoid injecting
+            // block anchors before inline tag references, which changes their
+            // visual line wrapping inside the payload preview.
+            const highlighted = _highlightContextText(raw, false);
             bodyHtml += `<article class="scp-ctx-block scp-ctx-timeline-item scp-ctx-role-${displayRole}" id="${blockId}">`;
             bodyHtml += `<span class="scp-ctx-timeline-dot" aria-hidden="true"></span>`;
             bodyHtml += `<div class="scp-ctx-block-header">${escHtml(label)}</div>`;

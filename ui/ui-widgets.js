@@ -629,6 +629,14 @@ export function buildQPSettingsUI(container) {
 // ─── Chat Message Picker ──────────────────────────────────────────────────────
 
 let _pickerLastIdx = -1;
+let _pickerRangeMode = false;
+
+function setPickerRangeMode(enabled) {
+    _pickerRangeMode = enabled;
+    const btn = document.getElementById('scp-picker-range');
+    btn?.classList.toggle('active', enabled);
+    btn?.setAttribute('aria-pressed', String(enabled));
+}
 
 function getPickedChatIndices() {
     try { return getCurrentSession().pickedChatIndices || []; } catch(_) { return []; }
@@ -667,6 +675,7 @@ export function openChatPicker() {
     if (!overlay) return;
     applyCustomTheme(getSettings().customTheme || THEME_PRESETS.default);
     _pickerLastIdx = -1;
+    setPickerRangeMode(false);
     renderPickerMessages();
     overlay.style.display = 'flex';
 }
@@ -790,10 +799,10 @@ function renderPickerMessages() {
                         r.querySelector('.scp-picker-cb')?.classList.toggle('checked', targetState);
                     }
                 });
-            } else if (e.shiftKey && _pickerLastIdx >= 0) {
+            } else if ((e.shiftKey || _pickerRangeMode) && _pickerLastIdx >= 0) {
                 const lo = Math.min(_pickerLastIdx, curIdx);
                 const hi = Math.max(_pickerLastIdx, curIdx);
-                const targetState = !row.classList.contains('selected');
+                const targetState = _pickerRangeMode || !row.classList.contains('selected');
                 body.querySelectorAll('.scp-picker-row').forEach(r => {
                     const ri = parseInt(r.dataset.idx);
                     if (ri >= lo && ri <= hi) {
@@ -801,6 +810,8 @@ function renderPickerMessages() {
                         r.querySelector('.scp-picker-cb')?.classList.toggle('checked', targetState);
                     }
                 });
+                _pickerLastIdx = curIdx;
+                if (_pickerRangeMode) setPickerRangeMode(false);
             } else {
                 const sel = row.classList.toggle('selected');
                 cb.classList.toggle('checked', sel);
@@ -855,11 +866,21 @@ export function setupChatPickerListeners() {
         _updatePickerCountEl();
     });
 
+    document.getElementById('scp-picker-range')?.addEventListener('click', () => {
+        if (_pickerLastIdx < 0) {
+            const selected = document.querySelector('#scp-picker-body .scp-picker-row.selected');
+            if (selected) _pickerLastIdx = parseInt(selected.dataset.idx);
+        }
+        setPickerRangeMode(!_pickerRangeMode);
+    });
+
     document.getElementById('scp-picker-clear')?.addEventListener('click', () => {
         document.querySelectorAll('#scp-picker-body .scp-picker-row').forEach(r => {
             r.classList.remove('selected');
             r.querySelector('.scp-picker-cb')?.classList.remove('checked');
         });
+        _pickerLastIdx = -1;
+        setPickerRangeMode(false);
         _updatePickerCountEl();
     });
 
