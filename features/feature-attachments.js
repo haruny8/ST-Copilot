@@ -172,6 +172,7 @@ export function renderAttachmentPreviews() {
 
 let _lightboxEl = null;
 let _lightboxScale = 1;
+let _lightboxOpenedAt = 0;
 
 export function _openImageLightbox(att) {
     if (_lightboxEl) _lightboxEl.remove();
@@ -179,28 +180,72 @@ export function _openImageLightbox(att) {
 
     const overlay = document.createElement('div');
     overlay.className = 'scp-lightbox';
+    // Inline styles as a safety net in case the extension stylesheet fails.
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999999;background:rgba(0,0,0,0.92);display:flex;overflow:auto;backdrop-filter:blur(4px);cursor:zoom-in;';
     _lightboxEl = overlay;
 
     const img = document.createElement('img');
     img.src = att.dataUrl;
     img.className = 'scp-lightbox-img';
-    img.style.transform = `scale(1)`;
-    img.style.transformOrigin = '50% 50%';
+    img.style.cssText = 'max-width:92vw;max-height:92vh;border-radius:6px;box-shadow:0 0 60px rgba(0,0,0,0.8);cursor:zoom-in;user-select:none;margin:auto;flex-shrink:0;';
 
     overlay.appendChild(img);
     document.body.appendChild(overlay);
+    // On touch devices a synthesized "ghost click" fires after the tap that
+    // opened the lightbox and hits the overlay itself, instantly closing it.
+    // Ignore overlay clicks for a short grace period after opening.
+    _lightboxOpenedAt = Date.now();
+
+    const applyZoom = (fx, fy) => {
+        if (_lightboxScale === 1) {
+            img.style.width = '';
+            img.style.height = '';
+            img.style.maxWidth = '92vw';
+            img.style.maxHeight = '92vh';
+            overlay.scrollTop = 0; overlay.scrollLeft = 0;
+        } else {
+            // Resize via width/height so the overlay scrolls instead of the
+            // scaled image overflowing (getting clipped) off-screen.
+            const rect = img.getBoundingClientRect();
+            const baseW = rect.width / _lightboxScale;
+            const baseH = rect.height / _lightboxScale;
+            img.style.maxWidth = 'none';
+            img.style.maxHeight = 'none';
+            img.style.width = `${baseW * _lightboxScale}px`;
+            img.style.height = `${baseH * _lightboxScale}px`;
+            // Keep the anchor point centered in view.
+            const w = baseW * _lightboxScale, h = baseH * _lightboxScale;
+            overlay.scrollLeft = fx * w - overlay.clientWidth / 2;
+            overlay.scrollTop = fy * h - overlay.clientHeight / 2;
+        }
+        img.style.cursor = _lightboxScale > 1 ? 'zoom-out' : 'zoom-in';
+    };
+
+    const zoomAt = (newScale, cx, cy) => {
+        // Anchor as a fraction of the CURRENT (pre-zoom) image.
+        const rect = img.getBoundingClientRect();
+        const fx = rect.width > 0 ? (cx - rect.left) / rect.width : 0.5;
+        const fy = rect.height > 0 ? (cy - rect.top) / rect.height : 0.5;
+        _lightboxScale = newScale;
+        applyZoom(fx, fy);
+    };
 
     img.addEventListener('click', e => {
-        if (_lightboxScale >= 3) { _lightboxScale = 1; }
-        else { _lightboxScale = Math.min(3, _lightboxScale + 1); }
-        const rect = img.getBoundingClientRect();
-        const ox = ((e.clientX - rect.left) / rect.width * 100).toFixed(1);
-        const oy = ((e.clientY - rect.top) / rect.height * 100).toFixed(1);
-        img.style.transformOrigin = `${ox}% ${oy}%`;
-        img.style.transform = `scale(${_lightboxScale})`;
-        img.style.cursor = _lightboxScale > 1 ? 'zoom-out' : 'zoom-in';
+        if (Date.now() - _lightboxOpenedAt < 400) return;
+        const next = _lightboxScale >= 3 ? 1 : Math.min(3, _lightboxScale + 1);
+        zoomAt(next, e.clientX, e.clientY);
     });
+    // Mouse wheel zoom: up = zoom in, down = zoom out.
+    overlay.addEventListener('wheel', e => {
+        e.preventDefault();
+        const steps = [1, 2, 3];
+        const idx = steps.indexOf(_lightboxScale);
+        if (e.deltaY < 0 && _lightboxScale < 3) zoomAt(steps[idx + 1], e.clientX, e.clientY);
+        else if (e.deltaY > 0 && _lightboxScale > 1) zoomAt(steps[Math.max(0, idx - 1)], e.clientX, e.clientY);
+    }, { passive: false });
+
     overlay.addEventListener('click', e => {
+        if (Date.now() - _lightboxOpenedAt < 400) return;
         if (e.target === overlay) { overlay.remove(); _lightboxEl = null; }
     });
     document.addEventListener('keydown', function onEsc(e) {
@@ -225,7 +270,11 @@ export async function _openTextLightbox(att) {
 
     overlay.appendChild(pre);
     document.body.appendChild(overlay);
-    overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.remove(); _lightboxEl = null; } });
+    _lightboxOpenedAt = Date.now();
+    overlay.addEventListener('click', e => {
+        if (Date.now() - _lightboxOpenedAt < 400) return;
+        if (e.target === overlay) { overlay.remove(); _lightboxEl = null; }
+    });
     document.addEventListener('keydown', function onEsc(e) { if (e.key === 'Escape') { overlay.remove(); _lightboxEl = null; document.removeEventListener('keydown', onEsc); } });
 }
 

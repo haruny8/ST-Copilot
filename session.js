@@ -272,6 +272,15 @@ export function setActiveSession(sessionId) {
     dbgAdd('SESSION_SWITCHED', { id: sessionId });
 }
 
+export function toggleSessionPinned(sessionId) {
+    const session = getChatBucket().sessions.find(s => s.id === sessionId);
+    if (!session) return false;
+    session.pinned = !session.pinned;
+    saveSessionsToMetadata();
+    dbgAdd('SESSION_PINNED_CHANGED', { id: session.id, pinned: session.pinned });
+    return session.pinned;
+}
+
 export function deleteCurrentSession() {
     const bucket = getChatBucket();
     if (!bucket.sessions.length) return createSession();

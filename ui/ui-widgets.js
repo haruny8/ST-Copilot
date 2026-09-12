@@ -62,7 +62,7 @@ import { getSettings, saveSettings } from '../settings.js';
 import {
     commitBucketChanges, genId, getChatBucket, getCurrentSession, loadSessionFile,
     getEffectiveSettings, makeChatPickKey, parseChatPickKey, saveSessionFile,
-    saveSessionsToMetadata, setActiveSession, updateDepthSlidersMax,
+    saveSessionsToMetadata, setActiveSession, toggleSessionPinned, updateDepthSlidersMax,
 } from '../session.js';
 import { $, autoResize, escHtml, showCustomDialog } from '../utils/util-dom.js';
 import { getBindingKey } from '../utils/util-st.js';
@@ -916,7 +916,14 @@ export async function refreshSessionDropdown() {
     if (!bucket.sessions.length) {
         listEl.innerHTML = `<div class="scp-sess-empty-label">No sessions — create one below</div>`;
     } else {
-        for (const sess of bucket.sessions) {
+        const sessions = bucket.sessions
+            .map((sess, index) => ({ sess, index }))
+            // NOTE: must coerce via ternary — Number(undefined) is NaN for
+            // sessions that were never pinned, which made the subtraction
+            // NaN and silently disabled the pinned-first ordering.
+            .sort((a, b) => (b.sess.pinned ? 1 : 0) - (a.sess.pinned ? 1 : 0) || a.index - b.index)
+            .map(({ sess }) => sess);
+        for (const sess of sessions) {
             const item = document.createElement('div');
             item.className = `scp-sess-item${sess.id === bucket.activeSessionId ? ' active' : ''}`;
             item.dataset.id = sess.id;
@@ -935,6 +942,23 @@ export async function refreshSessionDropdown() {
             item.appendChild(dot);
             item.appendChild(nameSpan);
             item.appendChild(count);
+
+            const pinBtn = document.createElement('button');
+            pinBtn.type = 'button';
+            pinBtn.className = `scp-sess-pin-btn${sess.pinned ? ' active' : ''}`;
+            pinBtn.title = sess.pinned ? 'Unpin session' : 'Pin session for this chat';
+            pinBtn.setAttribute('aria-label', pinBtn.title);
+            // U+1F4CD (📍) — U+1F5A8 (🖈) is missing from most mobile system
+            // fonts and renders as a tofu square, so use the core emoji instead.
+            pinBtn.textContent = '📍';
+            pinBtn.addEventListener('pointerdown', e => e.stopPropagation());
+            pinBtn.addEventListener('click', e => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleSessionPinned(sess.id);
+                refreshSessionDropdown();
+            });
+            item.appendChild(pinBtn);
 
             if (sess.isTemporary) {
                 const badge = document.createElement('span');
