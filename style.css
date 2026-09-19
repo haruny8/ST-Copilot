@@ -3959,6 +3959,18 @@ details.scp-reasoning-block[open] .scp-reasoning-summary::before { transform: ro
     color: var(--scp-accent) !important;
 }
 
+.scp-picker-scroll-btn {
+    min-width: 25px;
+    justify-content: center;
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+.scp-picker-scroll-btn svg {
+    width: 13px;
+    height: 13px;
+}
+
 @media screen and (max-width: 768px) {
     #scp-picker-overlay {
         padding: 0 !important;

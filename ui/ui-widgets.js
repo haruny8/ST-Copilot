@@ -676,13 +676,23 @@ export function openChatPicker() {
     applyCustomTheme(getSettings().customTheme || THEME_PRESETS.default);
     _pickerLastIdx = -1;
     setPickerRangeMode(false);
-    renderPickerMessages();
+    const hasSelectedMessages = renderPickerMessages();
     overlay.style.display = 'flex';
+    if (!hasSelectedMessages) requestAnimationFrame(() => scrollPickerBody('bottom', 'auto'));
 }
 
 function closeChatPicker() {
     const overlay = document.getElementById('scp-picker-overlay');
     if (overlay) overlay.style.display = 'none';
+}
+
+function scrollPickerBody(position, behavior = 'smooth') {
+    const body = document.getElementById('scp-picker-body');
+    if (!body) return;
+    body.scrollTo({
+        top: position === 'bottom' ? body.scrollHeight : 0,
+        behavior,
+    });
 }
 
 function renderPickerMessages() {
@@ -712,7 +722,7 @@ function renderPickerMessages() {
     if (!msgs.length) {
         body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--scp-text-muted)">No messages in current chat</div>';
         _updatePickerCountEl(0);
-        return;
+        return false;
     }
 
     const frag = document.createDocumentFragment();
@@ -831,6 +841,7 @@ function renderPickerMessages() {
             body.scrollTop = Math.max(0, targetTop);
         }, 50);
     }
+    return !!firstSel;
 }
 
 function _updatePickerCountEl(count) {
@@ -872,6 +883,14 @@ export function setupChatPickerListeners() {
             if (selected) _pickerLastIdx = parseInt(selected.dataset.idx);
         }
         setPickerRangeMode(!_pickerRangeMode);
+    });
+
+    document.getElementById('scp-picker-scroll-top')?.addEventListener('click', () => {
+        scrollPickerBody('top');
+    });
+
+    document.getElementById('scp-picker-scroll-bottom')?.addEventListener('click', () => {
+        scrollPickerBody('bottom');
     });
 
     document.getElementById('scp-picker-clear')?.addEventListener('click', () => {
