@@ -53,6 +53,7 @@ import { refreshAltGreetingsPickers } from './features/feature-character-engine.
 import {
     openLorebookManager, setupLorebookManagerListeners, setForwardDeps as setLorebookUiForwardDeps,
 } from './features/feature-lorebook-ui.js';
+import { openCharacterManager, setupCharacterManagerListeners } from './features/feature-character-manager-ui.js';
 import {
     setupMessagesScrollTracking, handleSend, handleRegen,
     isGenerating, setGeneratingState, setupSearchListeners,
@@ -123,7 +124,7 @@ async function injectUI() {
         }
     };
 
-    const templates = ['window', 'lorebook_manager', 'settings_overlay', 'chat_picker'];
+    const templates = ['window', 'lorebook_manager', 'character_manager', 'settings_overlay', 'chat_picker'];
     await Promise.all(templates.map(loadAndInject));
 
     setWindowEl(document.getElementById(WIN_ID));
@@ -157,6 +158,8 @@ function attachWindowListeners() {
                               e.target.closest('.scp-dialog-overlay') ||
                               document.getElementById('scp-settings-overlay')?.contains(e.target) ||
                               document.getElementById('scp-lb-overlay')?.contains(e.target) ||
+                              document.getElementById('scp-char-overlay')?.contains(e.target) ||
+                              document.getElementById('scp-char-field-editor-overlay')?.contains(e.target) ||
                               document.getElementById('scp-picker-overlay')?.contains(e.target) ||
                               document.getElementById('scp-diff-modal')?.contains(e.target);
         setCopilotActive(!!clickedInside);
@@ -301,6 +304,17 @@ function attachWindowListeners() {
             setTimeout(() => { _lbTouchPending = false; }, 400);
         }, { passive: false });
         lbBtn.addEventListener('click', () => { if (!_lbTouchPending) openLorebookManager(); });
+    }
+    const charBtn = $('scp-char-btn');
+    if (charBtn) {
+        let _charTouchPending = false;
+        charBtn.addEventListener('touchend', e => {
+            e.preventDefault();
+            _charTouchPending = true;
+            openCharacterManager();
+            setTimeout(() => { _charTouchPending = false; }, 400);
+        }, { passive: false });
+        charBtn.addEventListener('click', () => { if (!_charTouchPending) openCharacterManager(); });
     }
 
     // Search (DOM wiring for open/close/prev/next/word-toggle/input all
@@ -538,7 +552,7 @@ async function init() {
             if (html) container.insertAdjacentHTML('beforeend', html);
         } catch (e) {}
     }
-    restoreWindowState(); attachWindowListeners(); setupSettingsHandlers(); updateSettingsUI(); setupLorebookManagerListeners(); setupSettingsPanelListeners(); setupChatPickerListeners(); setupChangelogListeners();
+    restoreWindowState(); attachWindowListeners(); setupSettingsHandlers(); updateSettingsUI(); setupLorebookManagerListeners(); setupCharacterManagerListeners(); setupSettingsPanelListeners(); setupChatPickerListeners(); setupChangelogListeners();
 
     const s = getSettings();
 

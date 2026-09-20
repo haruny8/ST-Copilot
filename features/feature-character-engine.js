@@ -49,6 +49,48 @@ export function getEffectiveCharField(settings, k) {
     return !!(settings.charEditFields || {})[k];
 }
 
+export function isCharacterExcluded(settings, charId) {
+    return (settings.charMgrExcluded || []).includes(String(charId));
+}
+
+export function setCharacterExcluded(settings, charId, excluded) {
+    if (!Array.isArray(settings.charMgrExcluded)) settings.charMgrExcluded = [];
+    const id = String(charId);
+    const index = settings.charMgrExcluded.indexOf(id);
+    if (excluded && index === -1) settings.charMgrExcluded.push(id);
+    else if (!excluded && index !== -1) settings.charMgrExcluded.splice(index, 1);
+}
+
+export function getCharFieldOverride(settings, charId, field) {
+    return settings.charMgrFieldOverrides?.[String(charId)]?.[field];
+}
+
+export function setCharFieldOverride(settings, charId, field, value) {
+    const id = String(charId);
+    if (!settings.charMgrFieldOverrides) settings.charMgrFieldOverrides = {};
+    if (!settings.charMgrFieldOverrides[id]) settings.charMgrFieldOverrides[id] = {};
+    if (value === undefined) {
+        delete settings.charMgrFieldOverrides[id][field];
+        if (!Object.keys(settings.charMgrFieldOverrides[id]).length) delete settings.charMgrFieldOverrides[id];
+    } else {
+        settings.charMgrFieldOverrides[id][field] = value;
+    }
+}
+
+export function getEffectiveCharFieldForChar(settings, charId, field) {
+    const override = getCharFieldOverride(settings, charId, field);
+    return override !== undefined ? override : getEffectiveCharField(settings, field);
+}
+
+export function getActiveCharacterEntities() {
+    const ctx = SillyTavern.getContext();
+    if (ctx.groupId) return [];
+    const char = ctx.characters?.[ctx.characterId];
+    return char
+        ? [{ id: char.avatar ?? String(ctx.characterId), name: char.name, avatar: char.avatar, char, isPersona: false }]
+        : [];
+}
+
 export function buildAltGreetingsPicker(container, isOverride = false) {
     if (!container) return;
     container.innerHTML = '';
@@ -170,14 +212,18 @@ export function refreshAltGreetingsPickers() {
 
 export function buildCharacterContextBlock(settings) {
     const ctx = SillyTavern.getContext();
+    if (ctx.groupId) return '';
     const charId = ctx.characterId || 'unknown';
     const char = ctx.characters?.[charId];
     if (!char) return '';
+    const contextCharId = char.avatar ?? charId;
+    if (isCharacterExcluded(settings, contextCharId)) return '';
     const d = char.data || {};
     const parts = [];
+    const fieldEnabled = field => getEffectiveCharFieldForChar(settings, contextCharId, field);
 
     const charTags = getTagsForCharacter(char);
-    if (getEffectiveCharField(settings, 'tags') && charTags.length) {
+    if (fieldEnabled('tags') && charTags.length) {
         parts.push(`<tags>\n${charTags.join(', ')}\n</tags>`);
     }
 
@@ -189,9 +235,9 @@ export function buildCharacterContextBlock(settings) {
         mes_example: d.mes_example || char.mes_example,
     };
     for (const [key, val] of Object.entries(simple)) {
-        if (getEffectiveCharField(settings, key) && val) parts.push(`<${key}>\n${val}\n</${key}>`);
+        if (fieldEnabled(key) && val) parts.push(`<${key}>\n${val}\n</${key}>`);
     }
-    if (getEffectiveCharField(settings, 'alternate_greetings') && Array.isArray(d.alternate_greetings) && d.alternate_greetings.length) {
+    if (fieldEnabled('alternate_greetings') && Array.isArray(d.alternate_greetings) && d.alternate_greetings.length) {
         const agMap = settings.altGreetingIndices || {};
         const indices = Array.isArray(agMap[charId]) ? agMap[charId] : d.alternate_greetings.map((_, i) => i);
         const filtered = indices.filter(i => i >= 0 && i < d.alternate_greetings.length);
@@ -201,7 +247,7 @@ export function buildCharacterContextBlock(settings) {
             parts.push(`<alternate_greetings>\n${gs}\n</alternate_greetings>`);
         }
     }
-    if (getEffectiveCharField(settings, 'authors_note')) {
+    if (fieldEnabled('authors_note')) {
         const an = getAuthorsNote();
         if (an) parts.push(`<authors_note>\n${an}\n</authors_note>`);
     }
@@ -544,23 +590,41 @@ export async function saveCharacterField(char, fieldId, newValue) {
     
     if (fieldId === 'user_persona') {
         const pu = window.power_user || ctx.powerUserSettings || {};
-        const avatar = pu.persona;
-        if (avatar) {
-            try {
-                const res = await fetch('/api/characters/merge-attributes', {
-                    method: 'POST',
-                    headers: { ...ctx.getRequestHeaders(), 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ avatar: avatar, data: { description: newValue }, is_persona: true })
-                });
-                if (res.ok) {
-                    if (pu.personas && pu.personas[avatar]) pu.personas[avatar].description = newValue;
-                    return;
-                }
-            } catch(e) { console.warn("Failed to merge persona API:", e); }
+        let avatar = window.user_avatar || ctx.user_avatar || ctx.userAvatar || ctx.personaId || ctx.activePersonaId || ctx.active_persona_id;
+        if (!avatar && typeof document !== 'undefined') {
+            const selected = document.querySelector('#user_avatar_block .avatar-container[data-avatar-id].selected, #user_avatar_block .avatar-container[data-avatar-id][aria-selected="true"]');
+            if (selected) avatar = selected.getAttribute('data-avatar-id');
         }
-        if (pu.personas && pu.persona && pu.personas[pu.persona]) pu.personas[pu.persona].description = newValue;
-        else pu.persona_description = newValue;
+        if (typeof avatar === 'object' && avatar !== null) {
+            avatar = avatar.avatarId || avatar.avatar_id || avatar.user_avatar || avatar.userAvatar || avatar.id;
+        }
+        if (!avatar && pu.persona && pu.personas?.[pu.persona]) avatar = pu.persona;
+
+        if (avatar) {
+            if (!pu.persona_descriptions || typeof pu.persona_descriptions !== 'object') {
+                pu.persona_descriptions = {};
+            }
+            const descriptor = pu.persona_descriptions[avatar];
+            if (descriptor && typeof descriptor === 'object') {
+                descriptor.description = newValue;
+            } else {
+                pu.persona_descriptions[avatar] = { description: newValue };
+            }
+            pu.persona_description = newValue;
+        }
+        else {
+            pu.persona_description = newValue;
+        }
+
         if (typeof ctx.saveSettingsDebounced === 'function') ctx.saveSettingsDebounced();
+        else if (typeof window.saveSettingsDebounced === 'function') window.saveSettingsDebounced();
+
+        const personaInput = document.getElementById('persona_description');
+        if (personaInput) personaInput.value = newValue;
+
+        const es = ctx.eventSource || window.eventSource;
+        const et = ctx.eventTypes || ctx.event_types || window.event_types;
+        if (avatar && es && et?.PERSONA_UPDATED) await es.emit(et.PERSONA_UPDATED, avatar);
         return;
     }
 

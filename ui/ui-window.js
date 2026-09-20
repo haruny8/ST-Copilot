@@ -1273,7 +1273,7 @@ export function _setupBgUpload(btnId, inputId) {
 
 export function applyCustomTheme(theme) {
     if (!theme) return;
-    const targets = [getWindowEl(), getIconEl(), document.getElementById('scp-lb-overlay'), document.getElementById('scp-diff-modal'), document.getElementById('scp-settings-overlay'), document.getElementById('scp-picker-overlay')].filter(Boolean);
+    const targets = [getWindowEl(), getIconEl(), document.getElementById('scp-lb-overlay'), document.getElementById('scp-char-overlay'), document.getElementById('scp-char-field-editor-overlay'), document.getElementById('scp-diff-modal'), document.getElementById('scp-settings-overlay'), document.getElementById('scp-picker-overlay')].filter(Boolean);
     const s = getSettings();
     
     for (const [key, cssVar] of Object.entries(THEME_CSS_MAP)) {
@@ -1546,6 +1546,14 @@ export function setupSearchHotkey() {
         if (e.key.toLowerCase() !== key) return;
         if (needAlt !== e.altKey || needCtrl !== e.ctrlKey || needShift !== e.shiftKey || needMeta !== e.metaKey) return;
         
+        const expandedEditor = document.getElementById('scp-char-field-editor-overlay');
+        if (expandedEditor) {
+            e.preventDefault();
+            e.stopPropagation();
+            expandedEditor.dispatchEvent(new CustomEvent('scp-char-editor-find'));
+            return;
+        }
+
         if (!isCopilotActive()) return;
         
         const win = document.getElementById(WIN_ID);
@@ -1949,7 +1957,7 @@ export function buildThemeEditor(containerOverride) {
             saveSettings();
             _markDirty('theme');
             if (isColorKey) {
-                if (cssVar) [getWindowEl(), document.getElementById('scp-lb-overlay'), document.getElementById('scp-diff-modal')]
+                if (cssVar) [getWindowEl(), document.getElementById('scp-lb-overlay'), document.getElementById('scp-char-overlay'), document.getElementById('scp-char-field-editor-overlay'), document.getElementById('scp-diff-modal')]
                     .filter(Boolean).forEach(t => t.style.setProperty(cssVar, val));
                 preview.style.background = val;
                 preview.style.display = val ? '' : 'none';
@@ -1958,14 +1966,14 @@ export function buildThemeEditor(containerOverride) {
                 _fontDebounce = setTimeout(() => {
                     const fontVal = val.trim();
                     const targets = [getWindowEl(), document.getElementById('scp-lb-overlay'),
-                        document.getElementById('scp-diff-modal'), document.getElementById('scp-settings-overlay'),
+                        document.getElementById('scp-char-overlay'), document.getElementById('scp-char-field-editor-overlay'), document.getElementById('scp-diff-modal'), document.getElementById('scp-settings-overlay'),
                         document.getElementById('scp-picker-overlay')].filter(Boolean);
                     targets.forEach(t => fontVal
                         ? t.style.setProperty('--scp-font', fontVal)
                         : t.style.removeProperty('--scp-font'));
                 }, 600);
             } else {
-                if (cssVar) [getWindowEl(), document.getElementById('scp-lb-overlay'), document.getElementById('scp-diff-modal')]
+                if (cssVar) [getWindowEl(), document.getElementById('scp-lb-overlay'), document.getElementById('scp-char-overlay'), document.getElementById('scp-char-field-editor-overlay'), document.getElementById('scp-diff-modal')]
                     .filter(Boolean).forEach(t => t.style.setProperty(cssVar, val));
             }
             if (input.value !== val) input.value = val;

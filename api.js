@@ -453,7 +453,7 @@ const lastOpenIndex = new Map();
 for (const [start, end, type, match] of events) {
 if (type!== 'tag') continue;
 if (match.startsWith('</') || match.endsWith('/>') || match.startsWith('<!--')) continue;
-const openTag = match.match(/^<([^\s>]+)>$/);
+const openTag = match.match(/^<([^<>]+)>$/);
 if (!openTag ||!_ctxIsKnownTag(openTag[1])) continue;
 // Structural filter: real sections (built by buildSystemContent) always
 // have a newline immediately after the closing >. Inline mentions in
@@ -493,7 +493,7 @@ lastOpenIndex.set(key, start);
                 currentDepth++;
             }
 
-            const openTag = match.match(/^<([^\s>]+)>$/);
+            const openTag = match.match(/^<([^<>]+)>$/);
             if (anchorKeys !== false && openTag && _ctxIsKnownTag(openTag[1])) {
                 const key = _ctxSectionKey(openTag[1]);
                 if ((!anchorKeys || anchorKeys.has(key)) && start === lastOpenIndex.get(key)) {
@@ -517,7 +517,7 @@ lastOpenIndex.set(key, start);
 function _buildSystemInspectorBlocks(raw, blockId) {
     const sections = [
         { key: 'character_information', label: 'Character', className: 'character', pattern: /^<character_information>\r?$/m },
-        { key: 'user_persona', label: 'User Persona', className: 'persona', pattern: /^<[^\s<>]+_persona>\r?$/m },
+        { key: 'user_persona', label: 'User Persona', className: 'persona', pattern: /^<[^<>]*_persona>\r?$/m },
         { key: 'lorebook_context', label: 'Lorebook', className: 'lorebook', pattern: /^<lorebook_context>\r?$/m },
         { key: 'character_management', label: 'Character Card AI Edits', className: 'module', pattern: /^<character_management>\r?$/m },
         { key: 'lorebook_management', label: 'Lorebook AI Edits', className: 'module', pattern: /^<lorebook_management>\r?$/m },
@@ -590,7 +590,7 @@ label = 'Roleplay Context' + (msgCount? ` (${msgCount} msgs)`: '') + (idx > 0? `
         if (msg.role === 'system') {
             navHtml += `<button class="scp-ctx-nav-btn scp-ctx-nav-sub scp-ctx-nav-section-system-prompt" data-t="${blockId}">System Prompt</button>`;
 
-            const tagRe = /<([^\s<>]+)>/g;
+            const tagRe = /<([^<>]+)>/g;
             let tm;
             tagRe.lastIndex = 0;
                 const sectionKeys = new Set();
