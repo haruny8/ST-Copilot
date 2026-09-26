@@ -376,6 +376,17 @@ function attachWindowListeners() {
     }
     $('scp-send-btn')?.addEventListener('click', handleSend);
 
+    const emojiButton = $('scp-emoji-btn');
+    if (emojiButton) {
+        emojiButton.addEventListener('click', () => {
+            const input = $('scp-input');
+            if (input && window.STEmojiPicker?.openFor) {
+                const isOpen = window.STEmojiPicker.openFor(input, emojiButton);
+                emojiButton.setAttribute('aria-expanded', String(isOpen));
+            }
+        });
+    }
+
     // Modal
     $('scp-modal-close')?.addEventListener('click', () => { modalEl.style.display = 'none'; });
     let _modalMouseDown = null;

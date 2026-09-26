@@ -683,7 +683,7 @@
     align-items: flex-end;
 }
 .scp-input {
-    flex: 1; background: var(--scp-input-bg); border: var(--scp-border);
+    flex: 1; min-width: 0; background: var(--scp-input-bg); border: var(--scp-border);
     border-radius: 7px; color: var(--scp-text); font-family: var(--scp-font);
     font-size: 13px; line-height: 1.5; padding: 8px 11px; resize: none;
     outline: none; min-height: 36px; max-height: 180px; overflow-y: auto;
@@ -703,6 +703,22 @@
 .scp-send-btn:hover { background: var(--scp-accent); color: #fff; border-color: var(--scp-accent); box-shadow: 0 0 12px var(--scp-accent-dim); }
 .scp-send-btn:active { transform: scale(0.93); }
 .scp-send-btn:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+.scp-emoji-btn {
+    flex: 0 0 36px; width: 36px; height: 36px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    border: var(--scp-border); border-radius: 7px;
+    background: var(--scp-input-bg); color: var(--scp-text-muted);
+    font-size: 21px; line-height: 1; cursor: pointer;
+}
+.scp-emoji-btn:hover, .scp-emoji-btn[aria-expanded="true"] {
+    color: var(--scp-accent); border-color: var(--scp-accent-dim);
+    background: var(--scp-accent-bg);
+}
+
+@media screen and (max-width: 768px) {
+    .scp-emoji-btn { display: none; }
+}
 
 /* ── Dock Icon ───────────────────────────────────────────────── */
 

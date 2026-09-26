@@ -286,6 +286,31 @@ export async function assembleMessages(session, settings, pendingUserText, pendi
             })));
             const ctx = SillyTavern.getContext();
             const stMsgs = ctx.chat || [];
+            const visibleSlice = processedSlice.filter(m => !m.is_hidden);
+
+            if (settings.includeAlternateSwipes && visibleSlice.length > 0) {
+                let lastAssistantMessage = null;
+                for (let i = visibleSlice.length - 1; i >= 0; i--) {
+                    if (visibleSlice[i].role === 'assistant') {
+                        lastAssistantMessage = visibleSlice[i];
+                        break;
+                    }
+                }
+                if (lastAssistantMessage) {
+                    const stChatMessage = stMsgs[lastAssistantMessage.chatIndex];
+                    if (stChatMessage && Array.isArray(stChatMessage.swipes) && stChatMessage.swipes.length > 1) {
+                        let alternateSwipes = '<alternate_swipes>\n';
+                        const activeSwipeIndex = stChatMessage.swipe_id ?? stChatMessage.swipeIndex ?? 0;
+                        stChatMessage.swipes.forEach((swipe, index) => {
+                            if (index === activeSwipeIndex) return;
+                            const text = typeof swipe === 'string' ? swipe : (swipe?.mes || swipe?.content || '');
+                            if (text) alternateSwipes += `<swipe index="${index}">\n${text}\n</swipe>\n`;
+                        });
+                        alternateSwipes += '</alternate_swipes>\n';
+                        lastAssistantMessage.content = alternateSwipes + lastAssistantMessage.content;
+                    }
+                }
+            }
             const block = processedSlice.map(m => {
                 const hiddenAttr = m.is_hidden ? ' hidden_from_ai="true"' : '';
                 const summarySourceAttrs = m.inlineSummarySourcePath

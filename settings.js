@@ -78,6 +78,7 @@ export function getSettings() {
         forceStreaming: 'auto',
         applyRegexToContext: true,
         includeInlineSummaryOriginals: false,
+        includeAlternateSwipes: false,
         charEditAIEnabled: true,
         charEditPrompt: '',
         charEditFields: {

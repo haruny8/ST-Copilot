@@ -95,6 +95,7 @@ export function syncOverlayUI(key, val) {
         includePlotTrackerContext: 'scp-sp-include-plot-tracker',
         applyRegexToContext: 'scp-sp-apply-regex',
         includeInlineSummaryOriginals: 'scp-sp-inline-summary-originals',
+        includeAlternateSwipes: 'scp-sp-include-alt-swipes',
         contextDepth: 'scp-sp-depth-slider',
         wobbleWindow: 'scp-sp-wobble-window',
         performanceMode: 'scp-sp-perf-mode'
@@ -144,6 +145,7 @@ export function syncOverlayUI(key, val) {
         includePlotTrackerContext: 'scp-sp-ov-include-plot-tracker',
         applyRegexToContext: 'scp-sp-ov-apply-regex',
         includeInlineSummaryOriginals: 'scp-sp-ov-inline-summary-originals',
+        includeAlternateSwipes: 'scp-sp-ov-include-alt-swipes',
         contextDepth: 'scp-sp-ov-depth-slider',
         charField_tags: 'scp-sp-ov-ce-tags',
         charField_description: 'scp-sp-ov-ce-description',
@@ -202,6 +204,7 @@ export function updateSettingsUI() {
     setC('scp-include-plot-tracker', 'includePlotTrackerContext');
     setC('scp-apply-regex', 'applyRegexToContext');
     setC('scp-inline-summary-originals', 'includeInlineSummaryOriginals');
+    setC('scp-include-alt-swipes', 'includeAlternateSwipes');
     setC('scp-icon-persistent', 'floatingIconPersistent');
     setC('scp-ghost-hotkey-enabled', 'ghostModeHotkeyEnabled');
     setI('scp-hotkey', 'hotkey');
@@ -348,6 +351,7 @@ export function setupSettingsHandlers() {
     bindCheck('scp-include-plot-tracker', 'includePlotTrackerContext', updCtx);
     bindCheck('scp-apply-regex', 'applyRegexToContext');
     bindCheck('scp-inline-summary-originals', 'includeInlineSummaryOriginals', updCtx);
+    bindCheck('scp-include-alt-swipes', 'includeAlternateSwipes', updCtx);
     
     const stUpdateStreamBtns = (val) => {
         document.querySelectorAll('#scp-st-stream-auto, #scp-st-stream-on, #scp-st-stream-off').forEach(b => {
@@ -917,6 +921,7 @@ export function syncSPFromSettings() {
     gC('scp-sp-include-plot-tracker', s.includePlotTrackerContext);
     gC('scp-sp-apply-regex', s.applyRegexToContext);
     gC('scp-sp-inline-summary-originals', s.includeInlineSummaryOriginals);
+    gC('scp-sp-include-alt-swipes', s.includeAlternateSwipes);
     g('scp-sp-reasoning-trim', s.reasoningTrimStrings);
     g('scp-sp-sysprompt', s.systemPrompt || DEFAULT_SYSTEM_PROMPT);
     g('scp-sp-lb-manage-prompt', s.lorebookManagePrompt || DEFAULT_LB_MANAGE_PROMPT);
@@ -971,6 +976,7 @@ export function syncSPFromSettings() {
     gC('scp-sp-ov-include-plot-tracker', eff.includePlotTrackerContext);
     gC('scp-sp-ov-apply-regex', eff.applyRegexToContext);
     gC('scp-sp-ov-inline-summary-originals', eff.includeInlineSummaryOriginals);
+    gC('scp-sp-ov-include-alt-swipes', eff.includeAlternateSwipes);
 
     // Sync streaming override buttons
     const ovStreamVal = eff.forceStreaming === true ? 'on' : (eff.forceStreaming === false ? 'auto' : (eff.forceStreaming || 'auto'));
@@ -1133,6 +1139,7 @@ export function setupSettingsPanelListeners() {
             ghostModeHotkeyEnabled:'scp-ghost-hotkey-enabled', ghostModeHotkey:'scp-ghost-hotkey',
             applyRegexToContext:'scp-apply-regex',
             includeInlineSummaryOriginals:'scp-inline-summary-originals',
+            includeAlternateSwipes:'scp-include-alt-swipes',
             charEditAIEnabled: 'scp-char-edit-enabled',
             charEditPrompt: 'scp-char-edit-prompt',
             lorebookAIManageEnabled: 'scp-lb-ai-enabled-st',
@@ -1267,6 +1274,7 @@ export function setupSettingsPanelListeners() {
     bGCheck('scp-sp-include-plot-tracker', 'includePlotTrackerContext', () => updateMsgCount(getCurrentSession()));
     bGCheck('scp-sp-apply-regex', 'applyRegexToContext');
     bGCheck('scp-sp-inline-summary-originals', 'includeInlineSummaryOriginals', () => updateMsgCount(getCurrentSession()));
+    bGCheck('scp-sp-include-alt-swipes', 'includeAlternateSwipes', () => updateMsgCount(getCurrentSession()));
     bGInput('scp-sp-reasoning-trim', 'reasoningTrimStrings');
 
     document.getElementById('scp-sp-conn-source')?.addEventListener('change', e => {
@@ -1680,6 +1688,7 @@ export function setupSettingsPanelListeners() {
     bindOvCheck('scp-sp-ov-include-plot-tracker', 'includePlotTrackerContext');
     bindOvCheck('scp-sp-ov-apply-regex', 'applyRegexToContext');
     bindOvCheck('scp-sp-ov-inline-summary-originals', 'includeInlineSummaryOriginals');
+    bindOvCheck('scp-sp-ov-include-alt-swipes', 'includeAlternateSwipes');
     bindOvCheck('scp-sp-ov-char-edit-enabled', 'charEditAIEnabled');
     bindOvCheck('scp-sp-ov-lb-ai-enabled', 'lorebookAIManageEnabled');
     bindOvCheck('scp-sp-ov-chat-edit-enabled', 'chatEditAIEnabled');
@@ -1732,6 +1741,7 @@ export function setupSettingsPanelListeners() {
                 includePlotTrackerContext: ['scp-sp-ov-include-plot-tracker'],
                 applyRegexToContext: ['scp-sp-ov-apply-regex'],
                 includeInlineSummaryOriginals: ['scp-sp-ov-inline-summary-originals'],
+                includeAlternateSwipes: ['scp-sp-ov-include-alt-swipes'],
                 charField_tags: ['scp-sp-ov-ce-tags'],
                 charField_description: ['scp-sp-ov-ce-description'],
                 charField_personality: ['scp-sp-ov-ce-personality'],
