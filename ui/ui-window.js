@@ -602,6 +602,24 @@ export function makeDraggable(handle, target) {
 
     let isWobbly = true;
 
+    // Screen bounds for this gesture (desktop only — mobile keeps the old 0-floor).
+    let minX = 0, maxX = Infinity, minY = 0, maxY = Infinity;
+
+    const clampX = v => Math.min(maxX, Math.max(minX, v));
+    const clampY = v => Math.min(maxY, Math.max(minY, v));
+
+    const updateBounds = () => {
+        if (_isMobileLayout()) {
+            minX = 0; minY = 0; maxX = Infinity; maxY = Infinity;
+            return;
+        }
+        const { w: vw, h: vh } = _getViewportSize();
+        const w = target.offsetWidth, h = target.offsetHeight;
+        minX = 0; minY = 0;
+        maxX = Math.max(0, vw - w);
+        maxY = Math.max(0, vh - h);
+    };
+
     const tick = () => {
         if (!active && 
             Math.abs(vx) < 0.1 && Math.abs(vy) < 0.1 &&
@@ -611,8 +629,8 @@ export function makeDraggable(handle, target) {
             
             target.style.transform = '';
             target.style.transformOrigin = '';
-            target.style.left = `${Math.max(0, tx)}px`;
-            target.style.top = `${Math.max(0, ty)}px`;
+            target.style.left = `${clampX(tx)}px`;
+            target.style.top = `${clampY(ty)}px`;
             _rafId = null;
             
             vx = vy = 0;
@@ -636,6 +654,11 @@ export function makeDraggable(handle, target) {
             vy = (vy + dy * tension) * friction;
             cx += vx;
             cy += vy;
+
+            // Kill momentum that would carry the panel past the screen edge.
+            const bx = clampX(cx), by = clampY(cy);
+            if (bx !== cx) { cx = bx; vx = 0; }
+            if (by !== cy) { cy = by; vy = 0; }
 
             const targetRotY = dx * 0.12 + vx * 0.02; 
             const targetRotX = -(dy * 0.12 + vy * 0.02);
@@ -678,8 +701,8 @@ export function makeDraggable(handle, target) {
             vRotX = vRotY = vRotZ = vSkewX = vSkewY = 0;
 
             target.style.transform = '';
-            target.style.left = `${Math.max(0, cx)}px`;
-            target.style.top = `${Math.max(0, cy)}px`;
+            target.style.left = `${clampX(cx)}px`;
+            target.style.top = `${clampY(cy)}px`;
         }
 
         _rafId = requestAnimationFrame(tick);
@@ -690,17 +713,24 @@ export function makeDraggable(handle, target) {
         
         isWobbly = getSettings().wobbleWindow !== false && !getSettings().performanceMode;
 
+        // Anchor to left/top so the drag math matches the rendered position
+        // (on first run the window is still positioned by the CSS `right` default).
+        const r0 = target.getBoundingClientRect();
+        if (!target.style.left) { target.style.left = `${r0.left}px`; target.style.right = 'auto'; }
+        if (!target.style.top) target.style.top = `${r0.top}px`;
+        updateBounds();
+
         if (_rafId && isWobbly) {
-            sl = cx; 
-            st = cy;
+            sl = clampX(cx); 
+            st = clampY(cy);
             const w = target.offsetWidth;
             const h = target.offsetHeight;
             _anchorX = (e.clientX - (sl + w/2)) / (w/2);
             _anchorY = (e.clientY - (st + h/2)) / (h/2);
         } else {
             const r = target.getBoundingClientRect();
-            sl = r.left; 
-            st = r.top;
+            sl = clampX(r.left); 
+            st = clampY(r.top);
             _anchorX = (e.clientX - (r.left + r.width/2)) / (r.width/2);
             _anchorY = (e.clientY - (r.top + r.height/2)) / (r.height/2);
             
@@ -723,8 +753,8 @@ export function makeDraggable(handle, target) {
 
     handle.addEventListener('pointermove', e => {
         if (!active) return;
-        tx = Math.max(0, sl + (e.clientX - ox));
-        ty = Math.max(0, st + (e.clientY - oy));
+        tx = clampX(sl + (e.clientX - ox));
+        ty = clampY(st + (e.clientY - oy));
     });
 
     const onEnd = () => {
@@ -741,11 +771,18 @@ export function makeDraggable(handle, target) {
     handle.style.touchAction = 'none';
 }
 
+/** True when running on a phone/tablet layout (mirrors the CSS mobile breakpoint). */
+function _isMobileLayout() {
+    return window.innerWidth <= 900 || ('ontouchstart' in window && window.innerWidth <= 1366);
+}
+
 export function makeResizable(target) {
     const MIN_W = 320, MIN_H = 300;
     target.querySelectorAll('.scp-rh').forEach(h => {
         const dir = [...h.classList].find(c => /^scp-rh-\w/.test(c))?.replace('scp-rh-', '') || '';
         let active = false, sw, sh, sl, st, sx, sy, _rafId = null, _s = {};
+        // Per-gesture size limits (desktop only — mobile is handled by CSS max-width/height).
+        let maxW = Infinity, maxH = Infinity;
 
         const flush = () => {
             if (_s.w !== undefined) target.style.width = `${_s.w}px`;
@@ -760,6 +797,22 @@ export function makeResizable(target) {
             active = true; _s = {};
             const r = target.getBoundingClientRect();
             sx = e.clientX; sy = e.clientY; sw = r.width; sh = r.height; sl = r.left; st = r.top;
+
+            // Anchor to left/top so the panel always grows from the dragged edge.
+            // (On first run the window is still positioned by the CSS `right` default.)
+            if (!target.style.left) { target.style.left = `${sl}px`; target.style.right = 'auto'; }
+            if (!target.style.top) target.style.top = `${st}px`;
+
+            if (!_isMobileLayout()) {
+                const { w: vw, h: vh } = _getViewportSize();
+                // Growing right/down: stop at the viewport edge.
+                // Growing left/up: stop at 0 (the opposite edge is anchored).
+                maxW = Math.max(MIN_W, dir.includes('w') ? sl + sw : vw - sl);
+                maxH = Math.max(MIN_H, dir.includes('n') ? st + sh : vh - st);
+            } else {
+                maxW = Infinity; maxH = Infinity;
+            }
+
             h.setPointerCapture(e.pointerId);
             target.classList.add('scp-resizing');
         });
@@ -768,10 +821,10 @@ export function makeResizable(target) {
             if (!active) return;
             const dx = e.clientX - sx, dy = e.clientY - sy;
             _s = {};
-            if (dir.includes('e')) _s.w = Math.max(MIN_W, sw + dx);
-            if (dir.includes('s')) _s.h = Math.max(MIN_H, sh + dy);
-            if (dir.includes('w')) { const nw = Math.max(MIN_W, sw - dx); _s.w = nw; _s.l = sl + (sw - nw); }
-            if (dir.includes('n')) { const nh = Math.max(MIN_H, sh - dy); _s.h = nh; _s.t = st + (sh - nh); }
+            if (dir.includes('e')) _s.w = Math.min(maxW, Math.max(MIN_W, sw + dx));
+            if (dir.includes('s')) _s.h = Math.min(maxH, Math.max(MIN_H, sh + dy));
+            if (dir.includes('w')) { const nw = Math.min(maxW, Math.max(MIN_W, sw - dx)); _s.w = nw; _s.l = Math.max(0, sl + (sw - nw)); }
+            if (dir.includes('n')) { const nh = Math.min(maxH, Math.max(MIN_H, sh - dy)); _s.h = nh; _s.t = Math.max(0, st + (sh - nh)); }
             if (!_rafId) _rafId = requestAnimationFrame(flush);
         });
 
@@ -1318,7 +1371,7 @@ export function _getViewportSize() {
 
 export function restoreWindowState() {
     const s = getSettings(); if (!getWindowEl()) return;
-    const isMobile = window.innerWidth <= 900 || ('ontouchstart' in window && window.innerWidth <= 1366);
+    const isMobile = _isMobileLayout();
     
     const w = s.windowW || 440;
     const h = s.windowH || 600;
@@ -1373,8 +1426,9 @@ export function restoreWindowState() {
         getWindowEl().style.width = `${Math.min(w, Math.floor(window.innerWidth * 0.94), 560)}px`;
         getWindowEl().style.height = `${Math.min(h, Math.floor(window.innerHeight * 0.82), 700)}px`;
     } else {
-        getWindowEl().style.width = `${w}px`;
-        getWindowEl().style.height = `${h}px`;
+        const { w: vw, h: vh } = _getViewportSize();
+        getWindowEl().style.width = `${Math.max(320, Math.min(w, vw))}px`;
+        getWindowEl().style.height = `${Math.max(300, Math.min(h, vh))}px`;
     }
     getWindowEl().style.opacity = ((s.opacity || 95) / 100).toString();
     applyCustomTheme(s.customTheme || THEME_PRESETS.default);
