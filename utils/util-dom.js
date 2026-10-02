@@ -33,9 +33,59 @@ export function escHtml(str) {
 export function $(id) { return document.getElementById(id); }
 
 // ─── Textarea auto-resize ───────────────────────────────────────────────
+// Same visual behaviour as before, but coalesced to at most one
+// measurement per animation frame, and the expensive `height:auto`
+// re-measure is only paid when the text could actually have gotten
+// shorter (deletions / unwrapping). Plain typing therefore costs a single
+// `scrollHeight` read per frame instead of a write-read-write forced
+// reflow on every keystroke — which is what made typing in `#scp-input`
+// show up as hundreds of ms per key in INP traces. Nothing else in the
+// extension is touched: callers and timing (sized before next paint)
+// are unchanged.
+const _autoResizePending = new Set();
+const _autoResizeState = new WeakMap();
+let _autoResizeRaf = 0;
+
 export function autoResize(el) {
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+    if (!el || _autoResizePending.has(el)) return;
+    _autoResizePending.add(el);
+    if (!_autoResizeRaf) _autoResizeRaf = requestAnimationFrame(_autoResizeFlush);
+}
+
+function _autoResizeFlush() {
+    _autoResizeRaf = 0;
+    const els = [..._autoResizePending];
+    _autoResizePending.clear();
+    for (const el of els) {
+        if (!el.isConnected) continue;
+        let st = _autoResizeState.get(el);
+        if (!st) {
+            st = { grown: false, len: -1, nl: -1, minH: NaN };
+            _autoResizeState.set(el, st);
+        }
+        if (isNaN(st.minH)) st.minH = parseFloat(getComputedStyle(el).minHeight) || 0;
+
+        const value = el.value || '';
+        let nl = 0;
+        for (let i = 0; i < value.length; i++) if (value.charCodeAt(i) === 10) nl++;
+
+        const cur = el.clientHeight;
+        let needed = -1;
+        if (el.scrollHeight > cur + 1) {
+            // Overflowing: content height is readable directly, no
+            // height:auto round-trip needed.
+            needed = Math.min(el.scrollHeight, 180);
+        } else if (st.grown && (value.length < st.len || nl < st.nl)) {
+            // Text got shorter while we were grown: this is the only path
+            // that still does the classic auto-height re-measure.
+            el.style.height = 'auto';
+            needed = Math.min(el.scrollHeight, 180);
+        }
+        if (needed >= 0 && needed !== cur) el.style.height = `${needed}px`;
+        if (needed >= 0) st.grown = needed > st.minH + 1;
+        st.len = value.length;
+        st.nl = nl;
+    }
 }
 
 // ─── Clipboard ──────────────────────────────────────────────────────────

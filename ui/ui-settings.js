@@ -60,7 +60,7 @@ import {
     showWindow, updateBindingSection, updateIconVisibility, updateProfilesList,
     isGhostModeActive,
 } from './ui-window.js';
-import { updateMsgCount } from './ui-chat.js';
+import { updateMsgCount, resetRenderedHistory } from './ui-chat.js';
 import { refreshAltGreetingsPickers } from '../features/feature-character-engine.js';
 import { buildLorebookContextBlock } from '../features/feature-lorebook-engine.js';
 import { renderEntryList, updateLBFooterInfo, getLbActiveBook, getLbSearchQuery } from '../features/feature-lorebook-ui.js';
@@ -210,6 +210,7 @@ export function updateSettingsUI() {
     setI('scp-hotkey', 'hotkey');
     setI('scp-max-tokens', 'maxTokens');
     setI('scp-history-limit', 'localHistoryLimit');
+    setI('scp-display-limit', 'displayMessageLimit');
     setI('scp-depth-slider', 'contextDepth');
     setI('scp-reasoning-trim', 'reasoningTrimStrings');
     setI('scp-ghost-hotkey', 'ghostModeHotkey');
@@ -426,6 +427,7 @@ export function setupSettingsHandlers() {
     bindInput('scp-hotkey', 'hotkey');
     bindInput('scp-max-tokens', 'maxTokens', Number);
     bindInput('scp-history-limit', 'localHistoryLimit', Number, updCtx);
+    bindInput('scp-display-limit', 'displayMessageLimit', Number, resetRenderedHistory);
     bindSelect('scp-conn-source', 'connectionSource', v => {
         const g = $('scp-profile-group');
         if (g) g.style.display = v === 'profile' ? '' : 'none';
@@ -910,6 +912,7 @@ export function syncSPFromSettings() {
     if (gCp) gCp.style.display = s.connectionSource === 'profile' ? '' : 'none';
     g('scp-sp-max-tokens', s.maxTokens);
     g('scp-sp-history-limit', s.localHistoryLimit);
+    g('scp-sp-display-limit', s.displayMessageLimit);
     
     const spDs = document.getElementById('scp-sp-depth-slider');
     const spDv = document.getElementById('scp-sp-depth-val');
@@ -1128,6 +1131,7 @@ export function setupSettingsPanelListeners() {
             searchHotkeyEnabled:'scp-search-hotkey-enabled', searchHotkey:'scp-search-hotkey',
             floatingIconPersistent:'scp-icon-persistent', connectionSource:'scp-conn-source',
             maxTokens:'scp-max-tokens', localHistoryLimit:'scp-history-limit',
+            displayMessageLimit:'scp-display-limit',
             contextDepth:'scp-depth-slider', includeSystemPrompt:'scp-include-sysprompt',
             includeAuthorsNote:'scp-include-anote', includeCharacterCard:'scp-include-charcard',
             includeUserPersonality:'scp-include-persona', reasoningTrimStrings:'scp-reasoning-trim',
@@ -1255,6 +1259,7 @@ export function setupSettingsPanelListeners() {
 
     bGInput('scp-sp-max-tokens', 'maxTokens', Number);
     bGInput('scp-sp-history-limit', 'localHistoryLimit', Number, () => updateMsgCount(getCurrentSession()));
+    bGInput('scp-sp-display-limit', 'displayMessageLimit', Number, resetRenderedHistory);
 
     const spDs = document.getElementById('scp-sp-depth-slider');
     const spDv = document.getElementById('scp-sp-depth-val');

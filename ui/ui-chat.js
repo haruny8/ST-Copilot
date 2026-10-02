@@ -894,8 +894,17 @@ export function renderMsgBodyContent(msgEl, msg) {
 }
 
 let _tokenCountCache = new Map();
-const DISPLAY_MESSAGE_BATCH_SIZE = 40;
 let _renderedMessageStartIndex = 0;
+
+// How many of the session's messages get rendered in the Copilot chat at
+// once. User-facing only — the payload sent to the LLM is governed by the
+// separate `localHistoryLimit` setting. Older messages stay one click away
+// behind the "Load older messages" button. Configurable in Settings
+// ("Displayed Messages").
+function getDisplayBatchSize() {
+    const n = parseInt(getSettings().displayMessageLimit);
+    return isNaN(n) ? 40 : Math.max(5, Math.min(400, n));
+}
 
 function appendRenderedMessage(msg, beforeEl = null) {
     const c = $('scp-messages');
@@ -914,7 +923,7 @@ function loadOlderMessageBatch(session, preserveScroll = true) {
     if (!c || !button || _renderedMessageStartIndex <= 0) return false;
 
     const previousStart = _renderedMessageStartIndex;
-    const nextStart = Math.max(0, previousStart - DISPLAY_MESSAGE_BATCH_SIZE);
+    const nextStart = Math.max(0, previousStart - getDisplayBatchSize());
     const previousHeight = c.scrollHeight;
     const previousScrollTop = c.scrollTop;
     for (const msg of session.messages.slice(nextStart, previousStart).reverse()) {
@@ -987,7 +996,7 @@ export function renderSession(session) {
         updateMsgCount(session);
         return;
     }
-    _renderedMessageStartIndex = Math.max(0, session.messages.length - DISPLAY_MESSAGE_BATCH_SIZE);
+    _renderedMessageStartIndex = Math.max(0, session.messages.length - getDisplayBatchSize());
     renderLoadOlderButton(session);
     for (const msg of session.messages.slice(_renderedMessageStartIndex)) {
         appendRenderedMessage(msg);
@@ -1184,7 +1193,7 @@ export function updateMsgCount(session) {
             };
             
             runCalc();
-        }, 800);
+        }, 1000);
     }
 }
 

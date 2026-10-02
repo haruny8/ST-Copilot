@@ -31,6 +31,7 @@ export function getSettings() {
         searchHotkeyEnabled: true,
         contextDepth: 15,
         localHistoryLimit: 50,
+        displayMessageLimit: 40,
         connectionSource: 'default',
         connectionProfileId: '',
         maxTokens: 8048,

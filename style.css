@@ -69,6 +69,16 @@
 .scp-window *::-webkit-scrollbar-thumb { background: var(--scp-text-muted); border-radius: 3px; }
 .scp-window *::-webkit-scrollbar-corner { background: transparent; }
 
+@media (min-width: 901px) {
+    .scp-window *::-webkit-scrollbar { width: 11px; height: 11px; }
+    .scp-window *::-webkit-scrollbar-thumb {
+        background: color-mix(in srgb, var(--scp-text-muted) 88%, var(--scp-bg));
+        border: 3px solid transparent;
+        background-clip: padding-box;
+        border-radius: 6px;
+    }
+}
+
 /* ── Resize Handles ──────────────────────────────────────────── */
 
 .scp-rh { position: absolute; z-index: 10; }
@@ -1766,7 +1776,6 @@ details.scp-reasoning-block[open] .scp-reasoning-summary::before { transform: ro
     height: 40px;
     max-height: 1200px;
     background: transparent;
-    transition: height 0.2s ease;
 }
 .scp-html-block-code {
     margin: 0 !important;
