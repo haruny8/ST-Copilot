@@ -229,9 +229,22 @@ function buildPlotTrackerContextBlock(settings) {
         });
         const active = formatPlots(snapshot.active);
         const horizon = formatPlots(snapshot.horizon);
+        const keyItems = (Array.isArray(snapshot.keyItems) ? snapshot.keyItems : [])
+            .filter((item) => item.title || item.summary)
+            .map((item) => {
+                const title = String(item.title || '').replace(/[\r\n]+/g, ' ').trim();
+                const summary = String(item.summary || '').replace(/[\r\n]+/g, ' ').trim().replace(/\.\s*$/, '');
+                const location = String(item.location || '').replace(/[\r\n]+/g, ' ').trim();
+                const details = [summary, location ? `Last Known Location: ${location}` : '']
+                    .filter(Boolean)
+                    .join('; ');
+                const line = title && details ? `${title}: ${details}` : title || details;
+                return line ? `- ${line}` : '';
+            })
+            .filter(Boolean);
         const worldProgression = formatPlots(Array.isArray(snapshot.worldProgression) ? snapshot.worldProgression : []);
-        if (!active.length && !horizon.length && !worldProgression.length) return '';
-        return `<plot_tracker>\nThese are active plot threads, upcoming plot beats, and off-screen world progression manually maintained by the human user. Use these as reference regarding the current story, but still infer to the <roleplay_context> for full accuracy checks.\n\n**Active plot threads:**\n${active.join('\n') || '- None'}\n\n**Upcoming plot beats:**\n${horizon.join('\n') || '- None'}\n\n**Off-screen world progression:**\n${worldProgression.join('\n') || '- None'}\n</plot_tracker>`;
+        if (!active.length && !horizon.length && !keyItems.length && !worldProgression.length) return '';
+        return `<plot_tracker>\nThese are active plot threads, upcoming plot beats, tracked key items, and off-screen world progression manually maintained by the human user. Use these as reference regarding the current story, but still infer to the <roleplay_context> for full accuracy checks.\n\n**Active plot threads:**\n${active.join('\n') || '- None'}\n\n**Upcoming plot beats:**\n${horizon.join('\n') || '- None'}\n\n**Key items:**\n${keyItems.join('\n') || '- None'}\n\n**Off-screen world progression:**\n${worldProgression.join('\n') || '- None'}\n</plot_tracker>`;
     } catch (_) {
         return '';
     }
