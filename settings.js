@@ -95,6 +95,12 @@ export function getSettings() {
         charMgrExcluded: [],
         charMgrFieldOverrides: {},
         charMgrPrivateNotes: {},
+        charMgrDescriptionColors: {
+            bold: '#f2bd72',
+            italic: '#78c9ba',
+            bullet: '#91b8f2',
+            xml: '#c7a6f7',
+        },
         completionSound: 'none',
         completionSoundVolume: 80,
         completionSoundOnlyWhenUnfocused: false,

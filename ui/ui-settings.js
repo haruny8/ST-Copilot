@@ -50,6 +50,7 @@ import {
     setSessionOverride, updateDepthSlidersMax, updateSPOverrideIndicators, updateSessionOverrideIndicator,
 } from '../session.js';
 import { $, showCustomDialog } from '../utils/util-dom.js';
+import { showColorPicker } from '../utils/util-colorpicker.js';
 import { dbgDownload } from '../utils/util-debug.js';
 import { getBindingKey } from '../utils/util-st.js';
 import {
@@ -75,6 +76,82 @@ let _buildQPSetManager = () => {};
 let _buildPromptPresetManager = () => {};
 let _onChatChanged = () => {};
 let _openChangelog = () => {};
+
+const DESCRIPTION_COLOR_DEFAULTS = { bold: '#f2bd72', italic: '#78c9ba', bullet: '#91b8f2', xml: '#c7a6f7' };
+
+function syncDescriptionColorControls(key, value) {
+    [`scp-char-description-${key}-color`, `scp-sp-char-description-${key}-color`].forEach(id => {
+        const input = document.getElementById(id);
+        if (!input) return;
+        input.value = value;
+        const row = input.closest('.scp-theme-var-wrap');
+        const preview = row?.querySelector('.scp-theme-var-preview');
+        const reset = row?.querySelector('.scp-theme-var-reset');
+        if (preview) preview.style.background = value;
+        if (reset) reset.disabled = value.toLowerCase() === DESCRIPTION_COLOR_DEFAULTS[key];
+    });
+}
+
+function applyDescriptionColor(key, value) {
+    if (!CSS.supports('color', value)) return false;
+    const settings = getSettings();
+    if (!settings.charMgrDescriptionColors) settings.charMgrDescriptionColors = {};
+    settings.charMgrDescriptionColors[key] = value;
+    saveSettings();
+    syncDescriptionColorControls(key, value);
+    document.querySelectorAll('.scp-char-field-editor-overlay').forEach(editor => {
+        editor.style.setProperty(`--scp-char-description-${key}`, value);
+    });
+    return true;
+}
+
+function bindDescriptionColorControls() {
+    Object.keys(DESCRIPTION_COLOR_DEFAULTS).forEach(key => {
+        [`scp-char-description-${key}-color`, `scp-sp-char-description-${key}-color`].forEach(id => {
+            const input = document.getElementById(id);
+            if (!input) return;
+            const defaultColor = DESCRIPTION_COLOR_DEFAULTS[key];
+            const storedColor = getSettings().charMgrDescriptionColors?.[key] || defaultColor;
+            syncDescriptionColorControls(key, storedColor);
+            if (input.dataset.descriptionColorBound) return;
+            input.dataset.descriptionColorBound = 'true';
+
+            input.addEventListener('input', () => applyDescriptionColor(key, input.value));
+            const row = input.closest('.scp-theme-var-wrap');
+            const swatch = row?.querySelector('.scp-theme-var-preview');
+            const reset = row?.querySelector('.scp-theme-var-reset');
+            reset?.addEventListener('click', () => applyDescriptionColor(key, defaultColor));
+
+            const openPicker = () => {
+                if (!swatch) return;
+                const previewEl = document.createElement('div');
+                previewEl.className = 'scp-char-description-color-preview';
+                previewEl.innerHTML = `
+                    <div class="scp-char-description-color-preview-title">Description Preview</div>
+                    <p><span class="scp-char-format-bold">**Bold emphasis**</span> with <span class="scp-char-format-italic">*italic emphasis*</span>.</p>
+                    <p><span class="scp-char-format-bullet">-</span> <span class="scp-char-format-label">Important label</span>: a formatted bullet point.</p>
+                    <p><span class="scp-char-format-xml">&lt;Yu Xuan&gt;</span>Character text<span class="scp-char-format-xml">&lt;/Yu Xuan&gt;</span></p>
+                `;
+                const colors = getSettings().charMgrDescriptionColors || {};
+                Object.keys(DESCRIPTION_COLOR_DEFAULTS).forEach(colorKey => {
+                    previewEl.style.setProperty(`--scp-char-description-${colorKey}`, colors[colorKey] || DESCRIPTION_COLOR_DEFAULTS[colorKey]);
+                });
+                showColorPicker(swatch, input.value || defaultColor, value => {
+                    input.value = value;
+                    previewEl.style.setProperty(`--scp-char-description-${key}`, value);
+                    applyDescriptionColor(key, value);
+                }, { previewEl });
+            };
+            swatch?.addEventListener('click', openPicker);
+            swatch?.addEventListener('keydown', event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openPicker();
+                }
+            });
+        });
+    });
+}
 
 export function setForwardDeps({ buildQPSettingsUI, buildQPSetManager, buildPromptPresetManager, onChatChanged, openChangelog } = {}) {
     if (buildQPSettingsUI) _buildQPSettingsUI = buildQPSettingsUI;
@@ -228,6 +305,8 @@ export function updateSettingsUI() {
     });
     const cePromptEl = $('scp-char-edit-prompt');
     if (cePromptEl) cePromptEl.value = s.charEditPrompt || DEFAULT_CHAR_EDIT_DIRECTIVE.trim();
+
+    bindDescriptionColorControls();
 
     const ceFields = s.charEditFields || {};
     const setCe = (id, k) => { const el = $(id); if (el) el.checked = ceFields[k] !== false; };
@@ -455,6 +534,8 @@ export function setupSettingsHandlers() {
             _markDirty('config');
         });
     }
+
+    bindDescriptionColorControls();
     
     const bGCharFieldST = (id, fieldKey) => {
         const el = $(id); if (!el) return;
@@ -935,6 +1016,7 @@ export function syncSPFromSettings() {
 
     gC('scp-sp-char-edit-enabled', s.charEditAIEnabled);
     g('scp-sp-char-edit-prompt', s.charEditPrompt || DEFAULT_CHAR_EDIT_DIRECTIVE.trim());
+    bindDescriptionColorControls();
     const ceFields = s.charEditFields || {};
     gC('scp-sp-ce-tags', ceFields.tags !== false);
     gC('scp-sp-ce-description', ceFields.description !== false);
@@ -1376,6 +1458,7 @@ export function setupSettingsPanelListeners() {
         saveSettings();
         _markDirty('config');
     });
+    bindDescriptionColorControls();
     document.getElementById('scp-sp-reset-char-edit-prompt')?.addEventListener('click', async () => {
         const ok = await showCustomDialog({ type: 'confirm', title: 'Reset Char Edit Prompt', message: 'Reset to built-in default prompt?' });
         if (!ok) return;

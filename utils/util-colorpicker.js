@@ -44,7 +44,7 @@ function _toRgbaStr(r, g, b, a) {
 
 let _activeColorPop = null;
 
-export function showColorPicker(anchorEl, initialVal, onChange) {
+export function showColorPicker(anchorEl, initialVal, onChange, { previewEl } = {}) {
     if (_activeColorPop) { _activeColorPop.remove(); _activeColorPop = null; }
     const parsed = _parseRgba(initialVal);
     const hexVal = parsed ? _rgbToHex(parsed.r, parsed.g, parsed.b) : '#7c6dfa';
@@ -58,6 +58,7 @@ export function showColorPicker(anchorEl, initialVal, onChange) {
 
     const pop = document.createElement('div');
     pop.className = 'scp-color-pop';
+    if (previewEl) pop.classList.add('scp-color-pop-with-preview');
     pop.innerHTML = `
         <div class="scp-color-pop-row">
             <input type="color" class="scp-color-pop-wheel" value="${hexVal}">
@@ -69,16 +70,29 @@ export function showColorPicker(anchorEl, initialVal, onChange) {
         </div>
         <input type="text" class="scp-color-pop-text text_pole" value="${escHtml(initialVal)}">
     `;
+    if (previewEl) pop.prepend(previewEl);
     document.body.appendChild(pop);
     _activeColorPop = pop;
 
-    const rect = anchorEl.getBoundingClientRect();
-    pop.style.cssText += `position:fixed;z-index:999999;left:${rect.left}px;top:${rect.bottom + 6}px`;
-    requestAnimationFrame(() => {
-        const pr = pop.getBoundingClientRect();
-        if (pr.right > window.innerWidth - 8) pop.style.left = `${window.innerWidth - pr.width - 8}px`;
-        if (pr.bottom > window.innerHeight - 8) pop.style.top = `${rect.top - pr.height - 6}px`;
-    });
+    pop.style.cssText += 'position:fixed;z-index:999999;box-sizing:border-box;overflow-y:auto;overscroll-behavior:contain;transform:translate(-50%,-50%)';
+    const positionPop = () => {
+        const visualViewport = window.visualViewport;
+        const viewportLeft = visualViewport?.offsetLeft ?? 0;
+        const viewportTop = visualViewport?.offsetTop ?? 0;
+        const viewportWidth = visualViewport?.width ?? window.innerWidth;
+        const viewportHeight = visualViewport?.height ?? window.innerHeight;
+        const margin = 8;
+        pop.style.maxWidth = `${Math.max(1, viewportWidth - margin * 2)}px`;
+        pop.style.maxHeight = `${Math.max(1, viewportHeight - margin * 2)}px`;
+        pop.style.left = `${viewportLeft + viewportWidth / 2}px`;
+        pop.style.top = `${viewportTop + viewportHeight / 2}px`;
+    };
+    requestAnimationFrame(positionPop);
+    const visualViewport = window.visualViewport;
+    const reposition = () => requestAnimationFrame(positionPop);
+    window.addEventListener('resize', reposition);
+    visualViewport?.addEventListener('resize', reposition);
+    visualViewport?.addEventListener('scroll', reposition);
 
     const wheel = pop.querySelector('.scp-color-pop-wheel');
     const alpha = pop.querySelector('.scp-color-pop-alpha');
@@ -121,6 +135,9 @@ export function showColorPicker(anchorEl, initialVal, onChange) {
                 settingsOverlay.style.opacity = '';
                 settingsOverlay.style.pointerEvents = '';
             }
+            window.removeEventListener('resize', reposition);
+            visualViewport?.removeEventListener('resize', reposition);
+            visualViewport?.removeEventListener('scroll', reposition);
             document.removeEventListener('mousedown', onOutside, true);
         }
     };

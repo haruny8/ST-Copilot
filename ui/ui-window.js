@@ -1575,7 +1575,7 @@ export function setupHotkey() {
         if (e.key.toLowerCase() !== key) return;
         if (needAlt !== e.altKey || needCtrl !== e.ctrlKey || needShift !== e.shiftKey || needMeta !== e.metaKey) return;
         const active = document.activeElement;
-        if (active && active !== $('scp-input') && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT')) return;
+        if (active && active !== $('scp-input') && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT' || active.isContentEditable)) return;
         e.preventDefault(); toggleVisibility();
     };
     document.addEventListener('keydown', _hotkeyHandler);

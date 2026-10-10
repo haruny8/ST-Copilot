@@ -241,6 +241,45 @@
         </div>
 
         <div class="scp-sp-group">
+          <div class="scp-sp-group-title"><i class="fa-solid fa-highlighter"></i> Character Manager Description Colors</div>
+          <div class="scp-sp-hint">Only changes Markdown and XML-like tag formatting in expanded Character Manager Description fields. These are separate from Interface Theme colors.</div>
+          <div class="scp-theme-var-grid">
+            <div class="scp-theme-var-item">
+              <div class="scp-theme-var-label">Bold</div>
+              <div class="scp-theme-var-wrap">
+                <div class="scp-theme-var-preview scp-color-clickable" role="button" tabindex="0" title="Preview bold color"></div>
+                <input class="scp-theme-var-input" id="scp-sp-char-description-bold-color" type="text">
+                <button class="scp-theme-var-reset" id="scp-sp-char-description-bold-color-reset" type="button" title="Reset to default">↺</button>
+              </div>
+            </div>
+            <div class="scp-theme-var-item">
+              <div class="scp-theme-var-label">Italics</div>
+              <div class="scp-theme-var-wrap">
+                <div class="scp-theme-var-preview scp-color-clickable" role="button" tabindex="0" title="Preview italics color"></div>
+                <input class="scp-theme-var-input" id="scp-sp-char-description-italic-color" type="text">
+                <button class="scp-theme-var-reset" id="scp-sp-char-description-italic-color-reset" type="button" title="Reset to default">↺</button>
+              </div>
+            </div>
+            <div class="scp-theme-var-item">
+              <div class="scp-theme-var-label">Bullet points and labels</div>
+              <div class="scp-theme-var-wrap">
+                <div class="scp-theme-var-preview scp-color-clickable" role="button" tabindex="0" title="Preview bullet color"></div>
+                <input class="scp-theme-var-input" id="scp-sp-char-description-bullet-color" type="text">
+                <button class="scp-theme-var-reset" id="scp-sp-char-description-bullet-color-reset" type="button" title="Reset to default">↺</button>
+              </div>
+            </div>
+            <div class="scp-theme-var-item">
+              <div class="scp-theme-var-label">XML tags</div>
+              <div class="scp-theme-var-wrap">
+                <div class="scp-theme-var-preview scp-color-clickable" role="button" tabindex="0" title="Preview XML tag color"></div>
+                <input class="scp-theme-var-input" id="scp-sp-char-description-xml-color" type="text">
+                <button class="scp-theme-var-reset" id="scp-sp-char-description-xml-color-reset" type="button" title="Reset to default">↺</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="scp-sp-group">
           <div class="scp-sp-group-title" style="color:var(--scp-danger)"><i class="fa-solid fa-triangle-exclamation"></i> Danger Zone</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="scp-action-btn scp-sp-danger-btn" id="scp-sp-clear-sessions" style="flex:1">${I.trash}<span>Clear All Sessions</span></button>

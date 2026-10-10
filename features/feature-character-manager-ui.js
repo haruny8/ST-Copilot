@@ -290,8 +290,7 @@ function _openExpandedFieldEditor(field, input) {
                 <button class="scp-hbtn scp-char-field-editor-search-nav" type="button" data-direction="next" title="Next match (Enter)" aria-label="Next match">${I.chevronRight}</button>
             </div>
             <div class="scp-char-field-editor-canvas">
-                <pre class="scp-char-field-editor-highlight" aria-hidden="true"></pre>
-                <textarea class="scp-char-field-editor-input" spellcheck="true"></textarea>
+                <div class="scp-char-field-editor-input" contenteditable="true" role="textbox" aria-multiline="true" spellcheck="true"></div>
             </div>
             <div class="scp-char-field-editor-footer">
                 <span class="scp-char-field-editor-hint">Changes apply when you click Apply.</span>
@@ -303,6 +302,11 @@ function _openExpandedFieldEditor(field, input) {
         </div>`;
     host.appendChild(overlay);
     applyCustomTheme(getSettings().customTheme || THEME_PRESETS.default);
+    const descriptionColors = getSettings().charMgrDescriptionColors || {};
+    overlay.style.setProperty('--scp-char-description-bold', descriptionColors.bold || '#f2bd72');
+    overlay.style.setProperty('--scp-char-description-italic', descriptionColors.italic || '#78c9ba');
+    overlay.style.setProperty('--scp-char-description-bullet', descriptionColors.bullet || '#91b8f2');
+    overlay.style.setProperty('--scp-char-description-xml', descriptionColors.xml || '#c7a6f7');
 
     const editor = overlay.querySelector('.scp-char-field-editor-input');
     const closeButton = overlay.querySelector('.scp-char-field-editor-close');
@@ -311,11 +315,13 @@ function _openExpandedFieldEditor(field, input) {
     const searchInput = overlay.querySelector('.scp-char-field-editor-search-input');
     const searchCount = overlay.querySelector('.scp-char-field-editor-search-count');
     const searchNavButtons = overlay.querySelectorAll('.scp-char-field-editor-search-nav');
-    const highlight = overlay.querySelector('.scp-char-field-editor-highlight');
+    const formattedDescription = field.key === 'description' || field.key === 'user_persona';
     let searchMatches = [];
     let activeMatch = -1;
     let viewportRaf = 0;
     let searchOpen = false;
+    let editorValue = '';
+    let composing = false;
 
     const syncMobileViewport = () => {
         if (viewportRaf) return;
@@ -357,11 +363,141 @@ function _openExpandedFieldEditor(field, input) {
         }
         searchCount.textContent = `${activeMatch + 1} of ${searchMatches.length}`;
     };
-    const scrollMatchIntoView = match => {
-        if (!match?.element) return;
-        const targetTop = Math.max(0, match.element.offsetTop - ((editor.clientHeight - match.element.offsetHeight) / 2));
-        editor.scrollTop = targetTop;
-        highlight.scrollTop = targetTop;
+    const readEditorText = () => {
+        let text = '';
+        const visit = node => {
+            if (node.nodeType === Node.TEXT_NODE) {
+                text += node.nodeValue;
+                return;
+            }
+            if (node.nodeName === 'BR' && !(editor.childNodes.length === 1 && node.parentNode === editor)) {
+                text += '\n';
+                return;
+            }
+            if (node.nodeType !== Node.ELEMENT_NODE && node !== editor) return;
+            if (node.nodeName === 'BR') return;
+            Array.from(node.childNodes).forEach(child => {
+                const isBlock = child.nodeType === Node.ELEMENT_NODE && /^(DIV|P)$/.test(child.nodeName);
+                if (isBlock && text && !text.endsWith('\n')) text += '\n';
+                visit(child);
+            });
+        };
+        Array.from(editor.childNodes).forEach(visit);
+        return text;
+    };
+    const getSelectionOffsets = () => {
+        const selection = window.getSelection();
+        if (!selection?.rangeCount || !editor.contains(selection.anchorNode) || !editor.contains(selection.focusNode)) {
+            return { start: editorValue.length, end: editorValue.length };
+        }
+        const getOffset = (node, offset) => {
+            const range = document.createRange();
+            range.selectNodeContents(editor);
+            range.setEnd(node, offset);
+            return range.toString().length;
+        };
+        return {
+            start: getOffset(selection.anchorNode, selection.anchorOffset),
+            end: getOffset(selection.focusNode, selection.focusOffset),
+        };
+    };
+    const setSelectionOffsets = (start, end = start) => {
+        const textNodes = [];
+        const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+        while (walker.nextNode()) textNodes.push(walker.currentNode);
+        const findPosition = target => {
+            let remaining = target;
+            for (const node of textNodes) {
+                if (remaining <= node.nodeValue.length) return [node, remaining];
+                remaining -= node.nodeValue.length;
+            }
+            const last = textNodes[textNodes.length - 1];
+            return last ? [last, last.nodeValue.length] : [editor, 0];
+        };
+        const selection = window.getSelection();
+        const [startNode, startOffset] = findPosition(start);
+        const [endNode, endOffset] = findPosition(end);
+        if (selection.setBaseAndExtent) {
+            selection.setBaseAndExtent(startNode, startOffset, endNode, endOffset);
+        } else {
+            const range = document.createRange();
+            selection.removeAllRanges();
+            if (start <= end) {
+                range.setStart(startNode, startOffset);
+                range.setEnd(endNode, endOffset);
+                selection.addRange(range);
+            } else {
+                range.setStart(endNode, endOffset);
+                range.collapse(true);
+                selection.addRange(range);
+                selection.extend(startNode, startOffset);
+            }
+        }
+    };
+    const findMatches = query => {
+        searchMatches = [];
+        if (!query) return;
+        const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const pattern = new RegExp(escapedQuery, 'giu');
+        let match;
+        while ((match = pattern.exec(editorValue))) {
+            searchMatches.push({ start: match.index, end: match.index + match[0].length });
+        }
+    };
+    const renderEditor = (selectionOffsets = null) => {
+        const styleRanges = [];
+        const addRange = (start, end, className) => {
+            if (end > start) styleRanges.push({ start, end, className });
+        };
+        if (formattedDescription) {
+            const xmlTagPattern = /<\/?[^\s<>/]+(?:[ \t]+[^\s<>]+)*>/g;
+            let xmlTag;
+            while ((xmlTag = xmlTagPattern.exec(editorValue))) {
+                addRange(xmlTag.index, xmlTag.index + xmlTag[0].length, 'scp-char-format-xml');
+            }
+            const lines = editorValue.split(/(?<=\n)/);
+            let lineOffset = 0;
+            lines.forEach(lineWithBreak => {
+                const line = lineWithBreak.endsWith('\n') ? lineWithBreak.slice(0, -1) : lineWithBreak;
+                const emphasisPattern = /(\*\*[^*\n]+?\*\*|\*[^*\n]+?\*)/g;
+                let emphasis;
+                while ((emphasis = emphasisPattern.exec(line))) {
+                    const className = emphasis[0].startsWith('**') ? 'scp-char-format-bold' : 'scp-char-format-italic';
+                    addRange(lineOffset + emphasis.index, lineOffset + emphasis.index + emphasis[0].length, className);
+                }
+                const bullet = /^(\s*)(-)([ \t]+)([^:\r\n]+)(:)/.exec(line);
+                if (bullet) {
+                    addRange(lineOffset + bullet[1].length, lineOffset + bullet[1].length + 1, 'scp-char-format-bullet');
+                    const labelStart = lineOffset + bullet[1].length + bullet[2].length + bullet[3].length;
+                    addRange(labelStart, labelStart + bullet[4].length, 'scp-char-format-label');
+                }
+                lineOffset += lineWithBreak.length;
+            });
+        }
+        const query = searchOpen ? searchInput.value.trim() : '';
+        findMatches(query);
+        searchMatches.forEach((match, index) => addRange(
+            match.start,
+            match.end,
+            index === activeMatch ? 'scp-char-editor-match-active' : 'scp-char-editor-match',
+        ));
+
+        const boundaries = new Set([0, editorValue.length]);
+        styleRanges.forEach(range => { boundaries.add(range.start); boundaries.add(range.end); });
+        const ordered = [...boundaries].sort((a, b) => a - b);
+        const nodes = [];
+        for (let index = 0; index < ordered.length - 1; index++) {
+            const start = ordered[index];
+            const end = ordered[index + 1];
+            if (end <= start) continue;
+            const classes = styleRanges.filter(range => range.start <= start && range.end >= end).map(range => range.className);
+            const span = document.createElement('span');
+            span.className = [...new Set(classes)].join(' ');
+            span.textContent = editorValue.slice(start, end);
+            nodes.push(span);
+        }
+        editor.replaceChildren(...nodes);
+        if (selectionOffsets) setSelectionOffsets(selectionOffsets.start, selectionOffsets.end);
     };
     const selectMatch = (matchIndex, keepSearchFocus = false, selectEditorMatch = true) => {
         if (!searchMatches.length) {
@@ -371,52 +507,55 @@ function _openExpandedFieldEditor(field, input) {
         }
         activeMatch = (matchIndex + searchMatches.length) % searchMatches.length;
         const match = searchMatches[activeMatch];
-        const restoreSearchFocus = keepSearchFocus && document.activeElement === searchInput;
-        searchMatches.forEach(item => item.element.classList.remove('scp-char-field-editor-search-match-active'));
-        match.element.classList.add('scp-char-field-editor-search-match-active');
+        const restoreSearchFocus = keepSearchFocus;
         if (selectEditorMatch) {
-            if (!keepSearchFocus) editor.focus({ preventScroll: true });
-            editor.setSelectionRange(match.start, match.end);
+            renderEditor({ start: match.start, end: match.end });
+            if (!restoreSearchFocus) editor.focus({ preventScroll: true });
+            setSelectionOffsets(match.start, match.end);
             if (restoreSearchFocus) searchInput.focus({ preventScroll: true });
-            scrollMatchIntoView(match);
+        } else {
+            renderEditor();
         }
+        editor.querySelector('.scp-char-editor-match-active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
         updateSearchCount();
-    };
-    const renderSearchHighlights = query => {
-        const text = editor.value;
-        highlight.replaceChildren();
-        searchMatches = [];
-        if (!query) {
-            highlight.textContent = text;
-            return;
-        }
-
-        const textLower = text.toLocaleLowerCase();
-        const queryLower = query.toLocaleLowerCase();
-        let offset = 0;
-        let matchIndex = textLower.indexOf(queryLower, offset);
-        while (matchIndex >= 0) {
-            if (matchIndex > offset) highlight.append(document.createTextNode(text.slice(offset, matchIndex)));
-            const matchElement = document.createElement('mark');
-            matchElement.className = 'scp-char-field-editor-search-match';
-            matchElement.textContent = text.slice(matchIndex, matchIndex + query.length);
-            highlight.append(matchElement);
-            searchMatches.push({
-                element: matchElement,
-                start: matchIndex,
-                end: matchIndex + query.length,
-            });
-            offset = matchIndex + query.length;
-            matchIndex = textLower.indexOf(queryLower, offset);
-        }
-        if (offset < text.length) highlight.append(document.createTextNode(text.slice(offset)));
     };
     const refreshSearch = (selectFirst = true, keepSearchFocus = false, selectEditorMatch = true) => {
         const query = searchInput.value.trim();
-        renderSearchHighlights(query);
+        const selectionOffsets = getSelectionOffsets();
+        findMatches(query);
         activeMatch = searchMatches.length && selectFirst ? 0 : -1;
+        renderEditor(selectionOffsets);
         updateSearchCount();
         if (activeMatch !== -1) selectMatch(activeMatch, keepSearchFocus, selectEditorMatch);
+        else if (keepSearchFocus) searchInput.focus({ preventScroll: true });
+    };
+    const insertTextAtSelection = text => {
+        const selection = window.getSelection();
+        const range = selection?.rangeCount && editor.contains(selection.anchorNode)
+            ? selection.getRangeAt(0)
+            : document.createRange();
+        if (!selection?.rangeCount || !editor.contains(selection.anchorNode)) {
+            range.selectNodeContents(editor);
+            range.collapse(false);
+        }
+        range.deleteContents();
+        const textNode = document.createTextNode(text);
+        range.insertNode(textNode);
+        range.setStartAfter(textNode);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    };
+    const handleEditorInput = () => {
+        const selectionOffsets = getSelectionOffsets();
+        editorValue = readEditorText();
+        if (composing) return;
+        if (searchOpen) {
+            findMatches(searchInput.value.trim());
+            activeMatch = searchMatches.length ? 0 : -1;
+            updateSearchCount();
+        }
+        renderEditor(selectionOffsets);
     };
     const setSearchOpen = open => {
         searchOpen = open;
@@ -428,18 +567,25 @@ function _openExpandedFieldEditor(field, input) {
             searchInput.select();
             syncMobileViewport();
         } else {
+            activeMatch = -1;
+            searchMatches = [];
+            updateSearchCount();
+            renderEditor(getSelectionOffsets());
             editor.focus();
         }
     };
     const apply = () => {
-        input.value = editor.value;
+        editorValue = readEditorText();
+        input.value = editorValue;
         input.dispatchEvent(new Event('input', { bubbles: true }));
         input.dispatchEvent(new Event('change', { bubbles: true }));
         applyButton.classList.add('active');
         applyButton.querySelector('span').textContent = 'Applied';
         hint.textContent = 'Changes applied to the field.';
     };
-    editor.value = input.value;
+    editor.setAttribute('aria-label', `Edit ${field.label}`);
+    editorValue = String(input.value || '');
+    renderEditor({ start: 0, end: 0 });
     searchToggle.setAttribute('aria-expanded', 'false');
     searchToggle.addEventListener('click', () => setSearchOpen(!searchOpen));
     searchInput.addEventListener('input', () => refreshSearch(true, true));
@@ -456,17 +602,24 @@ function _openExpandedFieldEditor(field, input) {
         const direction = button.dataset.direction === 'previous' ? -1 : 1;
         selectMatch(activeMatch + direction, true);
     }));
-    editor.addEventListener('input', () => {
-        if (searchOpen) refreshSearch(true, true, false);
-        else {
-            highlight.textContent = editor.value;
-            highlight.scrollTop = editor.scrollTop;
+    editor.addEventListener('beforeinput', event => {
+        if (event.inputType === 'insertParagraph' || event.inputType === 'insertLineBreak') {
+            event.preventDefault();
+            insertTextAtSelection('\n');
+            handleEditorInput();
         }
     });
-    editor.addEventListener('scroll', () => {
-        highlight.scrollTop = editor.scrollTop;
-        highlight.scrollLeft = editor.scrollLeft;
+    editor.addEventListener('paste', event => {
+        event.preventDefault();
+        insertTextAtSelection((event.clipboardData.getData('text/plain') || '').replace(/\r\n?/g, '\n'));
+        handleEditorInput();
     });
+    editor.addEventListener('compositionstart', () => { composing = true; });
+    editor.addEventListener('compositionend', () => {
+        composing = false;
+        handleEditorInput();
+    });
+    editor.addEventListener('input', handleEditorInput);
     applyButton.addEventListener('click', apply);
     overlay.querySelector('.scp-char-field-editor-cancel').addEventListener('click', close);
     closeButton.addEventListener('click', close);
@@ -490,7 +643,7 @@ function _openExpandedFieldEditor(field, input) {
     requestAnimationFrame(() => {
         refreshSearch();
         editor.focus();
-        editor.setSelectionRange(editor.value.length, editor.value.length);
+        setSelectionOffsets(editorValue.length);
     });
 }
 
@@ -519,6 +672,7 @@ function _buildFieldRow(field, getValue, onDirty) {
     input.className = field.multiline ? 'scp-char-field-textarea' : 'scp-char-field-input';
     if (!field.multiline) input.type = 'text';
     if (field.multiline) input.rows = 5;
+    let timer = 0;
     const initial = String(getValue() || '');
     input.value = initial;
     row.append(labelRow, input);
@@ -533,7 +687,6 @@ function _buildFieldRow(field, getValue, onDirty) {
         }
     };
     if (showTokens) updateTokens(initial);
-    let timer = null;
     input.addEventListener('input', () => {
         onDirty(input.value, initial);
         if (!showTokens) return;
@@ -873,8 +1026,7 @@ function _renderCharDetail(entity) {
 export function openCharacterManager() {
     const overlay = document.getElementById('scp-char-overlay');
     if (!overlay) return;
-    const windowEl = document.getElementById('scp-window');
-    if (windowEl && overlay.parentElement !== windowEl) windowEl.appendChild(overlay);
+    if (overlay.parentElement !== document.body) document.body.appendChild(overlay);
     applyCustomTheme(getSettings().customTheme || THEME_PRESETS.default);
     _renderCharList();
     overlay.style.display = 'flex';
