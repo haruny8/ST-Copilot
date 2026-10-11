@@ -1,0 +1,816 @@
+/* ═══════════════════════════════════════════════════════════════
+   SETTINGS PANEL OVERLAY
+═══════════════════════════════════════════════════════════════ */
+
+.scp-settings-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh; height: 100dvh;
+    background: rgba(0,0,0,0.72);
+    backdrop-filter: blur(6px);
+    z-index: 99997;
+    display: flex; align-items: center; justify-content: center;
+    animation: scp-modal-fade 0.18s ease;
+    box-sizing: border-box;
+    padding: 16px;
+    overscroll-behavior: contain;
+    --scp-bg: rgba(18,18,22,0.97);
+    --scp-blur: blur(14px);
+    --scp-border: 1px solid rgba(255,255,255,0.09);
+    --scp-text: #e2e2e6;
+    --scp-text-muted: #72728a;
+    --scp-accent: #7c6dfa;
+    --scp-accent-dim: rgba(124,109,250,0.45);
+    --scp-accent-bg: rgba(124,109,250,0.12);
+    --scp-header-bg: rgba(255,255,255,0.04);
+    --scp-toolbar-bg: rgba(0,0,0,0.25);
+    --scp-input-bg: rgba(0,0,0,0.30);
+    --scp-font: var(--primaryFontFamily, system-ui, sans-serif);
+    --scp-font-mono: var(--monospaceFontFamily, monospace);
+    --scp-radius: 10px;
+    --scp-danger: #ff5c5c;
+    --scp-success: #4caf7d;
+    --scp-shadow: 0 24px 64px rgba(0,0,0,0.6);
+}
+
+.scp-settings-panel {
+    width: min(680px, calc(100vw - 32px));
+    height: min(780px, calc(100vh - 32px));
+    height: min(780px, calc(100dvh - 32px));
+    background: var(--scp-bg);
+    backdrop-filter: var(--scp-blur);
+    -webkit-backdrop-filter: var(--scp-blur);
+    border: var(--scp-border);
+    border-radius: 14px;
+    box-shadow: var(--scp-shadow), 0 0 0 1px rgba(255,255,255,0.04) inset;
+    display: flex; flex-direction: column; overflow: hidden;
+    color: var(--scp-text);
+    font-family: var(--scp-font);
+    font-size: 13px;
+    animation: scp-modal-slide 0.22s cubic-bezier(0.34,1.4,0.64,1);
+}
+
+/* ── SP Header ───────────────────────────────────────────────── */
+
+.scp-sp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--scp-header-bg);
+    border-bottom: var(--scp-border);
+    flex-shrink: 0;
+    gap: 8px;
+    position: relative;
+}
+
+.scp-sp-header-left {
+    display: flex; align-items: center; gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.scp-sp-title {
+    font-weight: 700; font-size: 14px; letter-spacing: 0.02em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.scp-sp-tabs {
+    display: inline-flex; align-items: center; gap: 2px;
+    background: rgba(0,0,0,0.35);
+    border-radius: 8px;
+    padding: 3px;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3) inset;
+    white-space: nowrap;
+    flex-shrink: 0;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: auto;
+}
+
+.scp-sp-header-right {
+    display: flex; align-items: center; justify-content: flex-end;
+    flex: 1;
+}
+
+.scp-sp-tab {
+    padding: 5px 24px; border-radius: 6px;
+    background: transparent; border: none;
+    color: var(--scp-text-muted); font-size: 12px; font-weight: 600;
+    cursor: pointer; font-family: var(--scp-font);
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    white-space: nowrap;
+}
+
+.scp-sp-tab:hover { color: var(--scp-text); }
+.scp-sp-tab.active {
+    background: rgba(255,255,255,0.12);
+    color: var(--scp-text);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3), 0 1px 1px rgba(255,255,255,0.1) inset;
+}
+
+.scp-sp-override-dot {
+    position: absolute; top: 4px; right: 6px;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #ffb432;
+    border: 1px solid rgba(0,0,0,0.4);
+    box-shadow: 0 0 4px rgba(255,180,50,0.6);
+}
+
+/* Gear button override indicator */
+.scp-hbtn-gear { position: relative; }
+.scp-gear-ov-dot {
+    position: absolute; top: 2px; right: 2px;
+    width: 5px; height: 5px; border-radius: 50%;
+    background: #ffb432;
+    border: 1px solid rgba(0,0,0,0.5);
+}
+
+/* ── SP Body ─────────────────────────────────────────────────── */
+
+.scp-sp-body {
+    flex: 1; overflow-y: auto; overflow-x: hidden;
+    padding: 14px 16px;
+    display: flex; flex-direction: column;
+    gap: 0;
+}
+
+.scp-sp-body::-webkit-scrollbar { width: 5px; }
+.scp-sp-body::-webkit-scrollbar-track { background: transparent; }
+.scp-sp-body::-webkit-scrollbar-thumb { background: var(--scp-text-muted); border-radius: 3px; }
+
+.scp-sp-tab-pane { display: flex; flex-direction: column; gap: 10px; }
+
+/* ── SP Groups ───────────────────────────────────────────────── */
+
+.scp-sp-group {
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 8px;
+}
+
+.scp-sp-group-title {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--scp-text-muted);
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 2px;
+}
+
+/* ── SP Form elements ────────────────────────────────────────── */
+
+.scp-sp-check {
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer; font-size: 12px; color: var(--scp-text);
+    user-select: none;
+}
+
+.scp-sp-check input[type=checkbox] {
+    appearance: none; -webkit-appearance: none;
+    width: 15px; height: 15px; margin: 0; flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.35); border-radius: 3px;
+    background: var(--scp-input-bg, rgba(0,0,0,0.3));
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15);
+    cursor: pointer; position: relative;
+}
+
+.scp-sp-check input[type=checkbox]:checked {
+    background: var(--scp-accent); border-color: var(--scp-accent);
+}
+
+.scp-sp-check input[type=checkbox]:checked::after {
+    content: ''; position: absolute; width: 4px; height: 8px;
+    left: 4px; top: 1px; border: solid #fff; border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.scp-sp-check input[type=checkbox]:focus-visible {
+    outline: 2px solid var(--scp-accent); outline-offset: 2px;
+}
+
+.scp-sp-row { display: flex; align-items: center; gap: 8px; }
+
+.scp-sp-field {
+    display: flex; flex-direction: column; gap: 4px;
+}
+
+.scp-sp-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--scp-text-muted);
+}
+
+.scp-sp-hint {
+    font-size: 9px; text-transform: none; letter-spacing: 0;
+    opacity: 0.65; color: var(--scp-text-muted);
+}
+
+.scp-sp-input {
+    background: var(--scp-input-bg); border: var(--scp-border);
+    border-radius: 6px; color: var(--scp-text); font-family: var(--scp-font);
+    font-size: 12px; padding: 7px 10px; outline: none;
+    transition: border-color 0.15s; box-sizing: border-box; width: 100%;
+}
+
+.scp-sp-input:focus { border-color: var(--scp-accent-dim); box-shadow: 0 0 0 2px rgba(124,109,250,0.1); }
+
+.scp-sp-select {
+    background: var(--scp-input-bg); border: var(--scp-border);
+    border-radius: 6px; color: var(--scp-text); font-family: var(--scp-font);
+    font-size: 12px; padding: 7px 10px; outline: none; cursor: pointer;
+    transition: border-color 0.15s; box-sizing: border-box; width: 100%;
+}
+
+.scp-sp-select:focus { border-color: var(--scp-accent-dim); }
+.scp-sp-select option { background: #1a1a20; }
+
+.scp-sp-textarea {
+    background: var(--scp-input-bg); border: var(--scp-border);
+    border-radius: 6px; color: var(--scp-text); font-family: var(--scp-font);
+    font-size: 12px; line-height: 1.5; padding: 8px 10px; outline: none;
+    resize: vertical; transition: border-color 0.15s;
+    box-sizing: border-box; width: 100%;
+}
+
+.scp-sp-textarea:focus { border-color: var(--scp-accent-dim); }
+.scp-sp-textarea-lg { min-height: 120px; }
+
+/* ── Session override styles ─────────────────────────────────── */
+
+.scp-sp-session-banner {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; border-radius: 8px;
+    background: var(--scp-accent-bg); border: 1px solid var(--scp-accent-dim);
+    font-size: 11px; color: var(--scp-text-muted);
+}
+
+.scp-sp-session-banner span:first-child { color: var(--scp-accent); flex-shrink: 0; }
+.scp-sp-session-banner span:nth-child(2) { flex: 1; }
+
+.scp-sp-reset-all-btn {
+    background: none; border: 1px solid rgba(255,92,92,0.3);
+    border-radius: 5px; color: var(--scp-danger); font-size: 10px;
+    font-weight: 600; cursor: pointer; padding: 3px 8px; flex-shrink: 0;
+    font-family: var(--scp-font); transition: all 0.15s;
+}
+.scp-sp-reset-all-btn:hover { background: rgba(255,92,92,0.12); border-color: var(--scp-danger); }
+
+.scp-sp-ov-wrap {
+    display: flex; align-items: center; gap: 6px;
+}
+
+.scp-sp-ov-wrap-col {
+    display: flex; flex-direction: column; gap: 4px;
+    align-items: stretch;
+}
+
+.scp-sp-ov-wrap-col .scp-sp-ov-clear {
+    align-self: flex-end;
+}
+
+.scp-sp-ov-clear {
+    flex-shrink: 0; width: 24px; height: 24px;
+    background: none; border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 5px; color: var(--scp-text-muted); cursor: pointer;
+    font-size: 13px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+}
+
+.scp-sp-ov-clear:not(:disabled):hover {
+    color: var(--scp-accent); background: var(--scp-accent-bg);
+    border-color: var(--scp-accent-dim);
+}
+
+.scp-sp-ov-clear:disabled { opacity: 0.22; cursor: default; }
+.scp-sp-ov-clear.active { color: #ffb432; border-color: rgba(255,180,50,0.4); background: rgba(255,180,50,0.08); }
+
+.scp-sp-ov-label { transition: color 0.15s; }
+.scp-sp-ov-label.has-override { color: #ffb432 !important; }
+
+.scp-sp-ov-check-row {
+    display: flex; align-items: center; gap: 6px;
+}
+
+.scp-sp-ov-check-row .scp-sp-check { flex: 1; }
+
+.scp-sp-ov-label-row {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 2px;
+}
+
+.scp-sp-ov-label-row .scp-sp-ov-label { flex: 1; }
+
+/* ── SP Footer ───────────────────────────────────────────────── */
+
+.scp-sp-footer {
+    padding: 7px 16px; flex-shrink: 0;
+    border-top: var(--scp-border);
+    background: rgba(0,0,0,0.1);
+    min-height: 28px; display: flex; align-items: center;
+}
+
+.scp-sp-footer-info {
+    font-size: 11px; color: #ffb432;
+    opacity: 0.85;
+}
+
+.scp-sp-danger-btn {
+    color: var(--scp-danger) !important;
+    border-color: rgba(255,92,92,0.3) !important;
+    background: rgba(255,92,92,0.06) !important;
+    align-self: flex-start;
+}
+.scp-sp-danger-btn:hover {
+    background: rgba(255,92,92,0.15) !important;
+    border-color: rgba(255,92,92,0.5) !important;
+}
+
+/* ── Mobile SP ───────────────────────────────────────────────── */
+
+/* ═══════════════════════════════════════════════════════════════
+   QUICK PROMPTS
+═══════════════════════════════════════════════════════════════ */
+
+/* ── QP Bar ──────────────────────────────────────────────────── */
+
+.scp-qp-bar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    /* closed state */
+    max-height: 0;
+    padding: 0 10px;
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+    background: var(--scp-toolbar-bg);
+    border-top: 0px solid transparent;
+    transition:
+        max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity    0.22s ease,
+        padding    0.28s cubic-bezier(0.4, 0, 0.2, 1),
+        border-top 0.28s ease;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    mask-image: linear-gradient(to right, transparent 0, black 12px, black calc(100% - 12px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0, black 12px, black calc(100% - 12px), transparent 100%);
+}
+.scp-qp-bar::-webkit-scrollbar { display: none; }
+
+.scp-qp-bar--open {
+    max-height: 52px;
+    padding: 6px 10px;
+    opacity: 1;
+    pointer-events: auto;
+    border-top: var(--scp-border);
+}
+
+.scp-qp-toggle-action {
+    padding: 3px 8px;
+    min-width: 26px;
+    justify-content: center;
+}
+.scp-qp-toggle-action svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+.scp-qp-toggle-action.active {
+    color: var(--scp-accent) !important;
+    background: var(--scp-accent-bg) !important;
+    border-color: var(--scp-accent-dim) !important;
+}
+
+/* ── QP Chip buttons ─────────────────────────────────────────── */
+
+.scp-qp-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px 3px 7px;
+    border-radius: 20px;
+    border: 1px solid var(--scp-accent-dim);
+    background: var(--scp-accent-bg);
+    color: var(--scp-accent);
+    font-size: 11px;
+    font-family: var(--scp-font);
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.scp-qp-chip:hover {
+    background: var(--scp-accent);
+    border-color: var(--scp-accent);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px var(--scp-accent-dim);
+}
+.scp-qp-chip:active { transform: translateY(0); box-shadow: none; }
+
+.scp-qp-icon { font-size: 13px; line-height: 1; }
+.scp-qp-label { font-weight: 500; }
+
+/* ── Icon Picker popup ───────────────────────────────────────── */
+
+.scp-qp-icon-picker {
+    display: grid;
+    grid-template-columns: repeat(10, 28px);
+    gap: 3px;
+    padding: 8px;
+    background: var(--SmartThemeBlurTrans, rgba(14,14,18,0.98));
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.65), 0 4px 12px rgba(0,0,0,0.35);
+    animation: scp-panel-in 0.15s ease;
+    max-width: min(320px, 92vw);
+}
+
+.scp-qp-icon-option {
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; border-radius: 6px;
+    border: 1px solid transparent; background: none;
+    cursor: pointer; transition: background 0.12s, border-color 0.12s, transform 0.1s;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+}
+.scp-qp-icon-option:hover {
+    background: rgba(255,255,255,0.1);
+    border-color: rgba(255,255,255,0.15);
+    transform: scale(1.25);
+}
+.scp-qp-icon-option.active {
+    background: var(--scp-accent-bg, rgba(124,109,250,0.12));
+    border-color: var(--scp-accent-dim, rgba(124,109,250,0.45));
+}
+
+/* ── QP Settings UI ──────────────────────────────────────────── */
+
+.scp-qp-settings-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.scp-qp-settings-row {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    background: rgba(0,0,0,0.18);
+    border: 1px solid rgba(255,255,255,0.05);
+    transition: border-color 0.15s;
+}
+.scp-qp-settings-row:hover { border-color: rgba(255,255,255,0.1); }
+
+.scp-qp-settings-row-top {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.scp-qp-settings-icon-btn {
+    flex-shrink: 0;
+    width: 32px; height: 32px;
+    border-radius: 7px; border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.05);
+    font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, border-color 0.15s, transform 0.12s;
+}
+.scp-qp-settings-icon-btn:hover {
+    background: rgba(255,255,255,0.1);
+    border-color: var(--scp-accent-dim);
+    transform: scale(1.1);
+}
+
+.scp-qp-settings-label-input {
+    flex: 1;
+    min-width: 0;
+    padding: 5px 8px !important;
+    font-size: 12px !important;
+}
+
+.scp-qp-settings-controls {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.scp-qp-settings-move {
+    width: 24px; height: 24px;
+    background: none; border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 5px; color: var(--scp-text-muted);
+    cursor: pointer; font-size: 12px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s; padding: 0;
+}
+.scp-qp-settings-move:hover:not(:disabled) {
+    color: var(--scp-accent);
+    background: var(--scp-accent-bg);
+    border-color: var(--scp-accent-dim);
+}
+.scp-qp-settings-move:disabled { opacity: 0.2; cursor: default; }
+
+.scp-qp-settings-del {
+    width: 24px; height: 24px;
+    background: none; border: 1px solid transparent;
+    border-radius: 5px; color: var(--scp-text-muted);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s; padding: 0;
+}
+.scp-qp-settings-del:hover {
+    color: var(--scp-danger);
+    background: rgba(255,92,92,0.1);
+    border-color: rgba(255,92,92,0.3);
+}
+
+.scp-qp-settings-text {
+    font-size: 12px !important;
+    min-height: 52px !important;
+    resize: vertical;
+}
+
+@media screen and (max-width: 600px) {
+    .scp-qp-bar { padding: 5px 8px; gap: 4px; }
+    .scp-qp-chip { font-size: 12px; padding: 4px 10px 4px 7px; }
+    .scp-qp-icon-picker { grid-template-columns: repeat(8, 32px); gap: 4px; }
+    .scp-qp-icon-option { width: 32px; height: 32px; font-size: 18px; }
+}
+
+@media screen and (max-width: 900px) {
+    .scp-settings-overlay { padding: 0 8px; }
+    .scp-settings-panel {
+        width: calc(100vw - 16px);
+        height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 90px);
+        height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 90px);
+        border-radius: 12px;
+    }
+
+    .scp-sp-header {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto auto;
+        gap: 10px 8px;
+        padding: 12px;
+    }
+
+    .scp-sp-header-left { grid-column: 1; grid-row: 1; flex: unset; }
+    
+    .scp-sp-header-right { 
+        grid-column: 2; grid-row: 1; 
+        justify-self: end; 
+        flex: unset; 
+    }
+
+    .scp-sp-tabs {
+        grid-column: 1 / -1; grid-row: 2;
+        width: 100%; display: flex; box-sizing: border-box;
+        position: relative; left: auto; transform: none;
+        overflow-x: auto; scrollbar-width: none;
+    }
+    .scp-sp-tabs::-webkit-scrollbar { display: none; }
+    .scp-sp-tab { flex-shrink: 0; padding: 5px 14px; }
+
+    .scp-sp-tab { flex: 1; text-align: center; }
+
+    .scp-sp-body { padding: 10px 12px; gap: 8px; }
+
+    .scp-sp-group { padding: 10px 12px; gap: 6px; }
+
+    .scp-sp-input, .scp-sp-select, .scp-sp-textarea { font-size: 13px; }
+
+    .scp-sp-check { font-size: 13px; }
+    .scp-sp-check input[type=checkbox] { width: 17px; height: 17px; }
+
+    .scp-sp-ov-clear { width: 28px; height: 28px; font-size: 14px; }
+
+    .scp-sp-session-banner { font-size: 12px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   STATISTICS MODULE
+═══════════════════════════════════════════════════════════════ */
+
+.scp-stats-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+}
+
+.scp-stats-pill-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.scp-stats-pill-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--scp-text-muted);
+    min-width: 42px;
+    flex-shrink: 0;
+}
+
+.scp-stats-pill {
+    padding: 3px 11px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    font-family: var(--scp-font);
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    color: var(--scp-text-muted);
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+
+.scp-stats-pill:hover {
+    color: var(--scp-text);
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.18);
+}
+
+.scp-stats-pill.active {
+    background: var(--scp-accent-bg);
+    border-color: var(--scp-accent-dim);
+    color: var(--scp-accent);
+}
+
+/* ── Metric Cards ─────────────────────────────────────────── */
+
+.scp-stats-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-bottom: 14px;
+}
+
+.scp-stats-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.025);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.1s;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+    overflow: hidden;
+}
+
+.scp-stats-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 2px;
+    background: var(--scp-stat-color, var(--scp-accent));
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.scp-stats-card:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); transform: translateY(-1px); }
+
+.scp-stats-card.active {
+    background: rgba(255,255,255,0.05);
+    border-color: var(--scp-stat-color, var(--scp-accent));
+}
+
+.scp-stats-card.active::before { opacity: 1; }
+
+.scp-stats-card-icon { font-size: 14px; line-height: 1; margin-bottom: 2px; }
+
+.scp-stats-card-val {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--scp-text);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+}
+
+.scp-stats-card.active .scp-stats-card-val { color: var(--scp-stat-color, var(--scp-accent)); }
+
+.scp-stats-card-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--scp-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+/* ── Chart ────────────────────────────────────────────────── */
+
+.scp-stats-chart-wrap {
+    margin-bottom: 16px;
+}
+
+.scp-stats-chart-inner {
+    position: relative;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(0,0,0,0.15);
+    padding: 4px 0 0;
+}
+
+.scp-stats-svg {
+    display: block;
+    min-width: 480px;
+    width: 100%;
+    height: auto;
+    cursor: crosshair;
+    overflow: visible;
+}
+
+.scp-stats-axis-label {
+    font-size: 9px;
+    fill: var(--scp-text-muted, #72728a);
+    font-family: var(--scp-font, system-ui);
+}
+
+.scp-stats-dot {
+    transition: r 0.18s cubic-bezier(0.34,1.56,0.64,1), fill 0.35s ease, opacity 0.3s ease;
+    cursor: pointer;
+}
+.scp-stats-line-path {
+    transition: stroke 0.35s ease;
+}
+.scp-stats-area-path {
+    transition: fill 0.35s ease;
+}
+
+/* ── Tooltip ──────────────────────────────────────────────── */
+
+.scp-stats-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--scp-bg, rgba(18,18,22,0.97));
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 7px;
+    padding: 5px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    min-width: 72px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    z-index: 10;
+    backdrop-filter: blur(8px);
+    animation: scp-fade-in 0.1s ease;
+}
+
+.scp-stats-tt-label {
+    font-size: 9px;
+    color: var(--scp-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+}
+
+.scp-stats-tt-val {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+}
+
+/* ── Danger zone ──────────────────────────────────────────── */
+
+.scp-stats-danger {
+    margin-top: 4px;
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+
+@media screen and (max-width: 600px) {
+    .scp-stats-cards { grid-template-columns: repeat(2, 1fr); gap: 5px; }
+    .scp-stats-card { padding: 8px 10px; }
+    .scp-stats-card-val { font-size: 16px; }
+    .scp-stats-pill { font-size: 12px; padding: 4px 10px; }
+    .scp-stats-pill-label { min-width: 36px; font-size: 9px; }
+}
+

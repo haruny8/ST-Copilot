@@ -71,10 +71,7 @@ export function showColorPicker(anchorEl, initialVal, onChange, { previewEl } = 
         <input type="text" class="scp-color-pop-text text_pole" value="${escHtml(initialVal)}">
     `;
     if (previewEl) pop.prepend(previewEl);
-    document.body.appendChild(pop);
-    _activeColorPop = pop;
-
-    pop.style.cssText += 'position:fixed;z-index:999999;box-sizing:border-box;overflow-y:auto;overscroll-behavior:contain;transform:translate(-50%,-50%)';
+    pop.style.cssText = 'position:fixed;z-index:999999;box-sizing:border-box;overflow-y:auto;overscroll-behavior:contain;transform:translate(-50%,-50%)';
     const positionPop = () => {
         const visualViewport = window.visualViewport;
         const viewportLeft = visualViewport?.offsetLeft ?? 0;
@@ -87,7 +84,10 @@ export function showColorPicker(anchorEl, initialVal, onChange, { previewEl } = 
         pop.style.left = `${viewportLeft + viewportWidth / 2}px`;
         pop.style.top = `${viewportTop + viewportHeight / 2}px`;
     };
-    requestAnimationFrame(positionPop);
+    positionPop();
+    document.body.appendChild(pop);
+    _activeColorPop = pop;
+
     const visualViewport = window.visualViewport;
     const reposition = () => requestAnimationFrame(positionPop);
     window.addEventListener('resize', reposition);
