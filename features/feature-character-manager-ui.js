@@ -327,7 +327,7 @@ function _openExpandedFieldEditor(field, input) {
         if (viewportRaf) return;
         viewportRaf = requestAnimationFrame(() => {
             viewportRaf = 0;
-            if (!window.visualViewport || !window.matchMedia('(max-width: 600px)').matches) return;
+            if (!window.visualViewport || !window.matchMedia('(max-width: 900px)').matches) return;
             const viewport = window.visualViewport;
             overlay.style.position = 'fixed';
             overlay.style.inset = 'auto';

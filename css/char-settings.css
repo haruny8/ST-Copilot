@@ -129,8 +129,6 @@
 .scp-char-override-reset:disabled { opacity: 0.35; cursor: default; }
 
 @media screen and (max-width: 600px) {
-    .scp-char-overlay { align-items: center; padding: 0 8px; }
-    .scp-char-panel { width: calc(100vw - 16px); height: calc(100vh - 90px); height: calc(100dvh - 90px); border-radius: 12px; }
     .scp-char-body { flex-direction: column; }
     .scp-char-sidebar { width: 100%; height: auto; max-height: 160px; flex: 0 0 auto; border-right: none; border-bottom: var(--scp-border); }
     .scp-char-list { max-height: 112px; }
@@ -143,8 +141,6 @@
     .scp-char-tabs { padding-left: 10px; padding-right: 10px; }
     .scp-char-main { display: block; overflow-y: auto; overscroll-behavior: contain; }
     .scp-char-main > .scp-char-pane { display: flex; flex: none; overflow: visible; }
-    .scp-char-field-editor-overlay { padding: 8px; }
-    .scp-char-field-editor { width: min(558px, calc(100vw - 32px)); height: min(680px, calc(100dvh - 80px)); min-height: 260px; border-radius: 10px; }
     .scp-char-field-editor-search { gap: 4px; padding: 6px 8px; }
     .scp-char-field-editor-search-input { font-size: 13px; }
     .scp-char-field-editor-search-count { min-width: 48px; font-size: 10px; }
@@ -195,6 +191,34 @@
     .scp-char-field-editor-input { padding: 17px; font-size: 15px; line-height: 1.65; }
     .scp-char-field-editor-hint { font-size: 12px; }
     .scp-char-field-editor-actions .scp-action-btn { font-size: 13px; }
+}
+
+@media screen and (max-width: 900px) {
+    .scp-char-overlay {
+        align-items: stretch;
+        padding: 0;
+    }
+    .scp-char-panel {
+        width: 100%;
+        height: 100%;
+        max-width: none;
+        max-height: none;
+        box-sizing: border-box;
+        border-radius: 0;
+    }
+    .scp-char-field-editor-overlay {
+        align-items: stretch;
+        justify-content: stretch;
+        padding: 0;
+    }
+    .scp-char-field-editor {
+        width: 100%;
+        height: 100%;
+        max-width: none;
+        max-height: none;
+        min-height: 0;
+        border-radius: 0;
+    }
 }
 
 /* ── Settings Panel ──────────────────────────────────────────── */
