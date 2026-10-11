@@ -581,9 +581,7 @@
         overflow-x: auto; scrollbar-width: none;
     }
     .scp-sp-tabs::-webkit-scrollbar { display: none; }
-    .scp-sp-tab { flex-shrink: 0; padding: 5px 14px; }
-
-    .scp-sp-tab { flex: 1; text-align: center; }
+    .scp-sp-tab { flex-shrink: 0; padding: 5px 14px; flex: 1; text-align: center; }
 
     .scp-sp-body { padding: 10px 12px; gap: 8px; }
 

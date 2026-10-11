@@ -3,7 +3,7 @@
    Theme variables applied via JS applyCustomTheme().
 ═══════════════════════════════════════════════════════════════ */
 
-/* ── Base Variable Defaults ──────────────────────────────────── */
+/* ── Base Window and Variables ───────────────────────────────── */
 
 .scp-window {
     --scp-bg:          rgba(18,18,22,0.94);
@@ -26,11 +26,6 @@
     --scp-radius:      10px;
     --scp-danger:      #ff5c5c;
     --scp-success:     #4caf7d;
-}
-
-/* ── Base Window ─────────────────────────────────────────────── */
-
-.scp-window {
     position: fixed;
     top: 80px; right: 24px;
     width: 440px; height: 600px;
@@ -177,10 +172,6 @@
     transition: opacity 0.4s ease !important;
 }
 
-.scp-window.scp-ghost-mode .scp-hbtn-ghost {
-    pointer-events: auto !important;
-}
-
 .scp-hbtn-ghost {
     transition: color 0.15s, background 0.15s, transform 0.15s, opacity 0.4s !important;
 }
@@ -199,6 +190,7 @@
 }
 
 .scp-window.scp-ghost-mode .scp-hbtn-ghost {
+    pointer-events: auto !important;
     opacity: 1 !important;
     color: var(--scp-accent) !important;
     background: var(--scp-accent-bg) !important;
@@ -329,6 +321,7 @@
     background: transparent; color: var(--scp-text-muted);
     cursor: pointer; opacity: 0.7;
     transition: color 0.15s, background 0.15s, opacity 0.15s;
+    font-size: 13px; line-height: 1;
 }
 .scp-sess-pin-btn:hover,
 .scp-sess-pin-btn:focus-visible {
@@ -344,10 +337,6 @@
     opacity: 0.45;
     filter: grayscale(1);
 }
-.scp-sess-pin-btn {
-    font-size: 13px; line-height: 1;
-}
-
 .scp-sess-tmp-badge {
     font-size: 9px; padding: 1px 5px; border-radius: 3px;
     background: rgba(255,180,50,0.15); color: #ffb432;

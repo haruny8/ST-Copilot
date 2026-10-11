@@ -295,8 +295,6 @@
     font-size: 12px; outline: none; cursor: pointer;
     padding: 3px 6px;
 }
-.scp-profile-bar select option { background: #1a1a20; }
-
 .scp-profile-icon-btn {
     background: none; border: none; cursor: pointer;
     color: var(--SmartThemeBodyColorTextMuted, #72728a);

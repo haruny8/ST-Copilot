@@ -427,12 +427,6 @@
 .scp-lb-proposal-world { font-size: 10px; color: var(--scp-text-muted); }
 .scp-lb-proposal-preview { font-size: 11px; color: var(--scp-text-muted); margin-top: 5px; font-style: italic; line-height: 1.5; }
 .scp-lb-proposal-triggers { font-size: 10px; color: var(--scp-accent); opacity: 0.7; margin-top: 3px; }
-.scp-lb-proposal-diff-btn {
-    font-size: 10px; border-radius: 4px; cursor: pointer;
-    background: rgba(255,255,255,0.06); border: var(--scp-border); color: var(--scp-text-muted);
-    font-family: var(--scp-font); transition: all 0.15s;
-}
-.scp-lb-proposal-diff-btn:hover { color: var(--scp-accent); background: var(--scp-accent-bg); border-color: var(--scp-accent-dim); }
 .scp-lb-proposal-footer { display: flex; gap: 8px; }
 .scp-lb-proposal-apply, .scp-lb-proposal-reject {
     padding: 5px 14px; border-radius: 6px; font-size: 11px; font-weight: 600;
@@ -581,8 +575,62 @@
 }
 
 .scp-lb-proposal-edit-toggle,
-.scp-lb-proposal-diff-btn,
-.scp-lb-proposal-item-apply,
+.scp-lb-proposal-diff-btn {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
+    border-radius: 5px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    transition: all 0.15s ease;
+    box-sizing: border-box;
+    padding: 0;
+    border: 1px solid transparent;
+    font-family: var(--scp-font);
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: var(--scp-text-muted);
+}
+
+.scp-lb-proposal-edit-toggle:hover,
+.scp-lb-proposal-edit-toggle.active,
+.scp-lb-proposal-diff-btn:hover {
+    color: var(--scp-accent);
+    background: var(--scp-accent-bg);
+    border-color: var(--scp-accent-dim);
+}
+
+.scp-lb-proposal-item-apply {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
+    border-radius: 5px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    transition: all 0.15s ease;
+    box-sizing: border-box;
+    padding: 0;
+    border: 1px solid transparent;
+    font-family: var(--scp-font);
+    background: rgba(76, 175, 125, 0.1);
+    border-color: rgba(76, 175, 125, 0.3);
+    color: var(--scp-success);
+}
+
+.scp-lb-proposal-item-apply:hover:not(:disabled) {
+    background: rgba(76, 175, 125, 0.25);
+    border-color: var(--scp-success);
+    color: #fff;
+}
+
 .scp-lb-proposal-item-reject {
     width: 24px;
     height: 24px;
@@ -599,36 +647,6 @@
     padding: 0;
     border: 1px solid transparent;
     font-family: var(--scp-font);
-}
-
-.scp-lb-proposal-edit-toggle,
-.scp-lb-proposal-diff-btn {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.1);
-    color: var(--scp-text-muted);
-}
-
-.scp-lb-proposal-edit-toggle:hover,
-.scp-lb-proposal-edit-toggle.active,
-.scp-lb-proposal-diff-btn:hover {
-    color: var(--scp-accent);
-    background: var(--scp-accent-bg);
-    border-color: var(--scp-accent-dim);
-}
-
-.scp-lb-proposal-item-apply {
-    background: rgba(76, 175, 125, 0.1);
-    border-color: rgba(76, 175, 125, 0.3);
-    color: var(--scp-success);
-}
-
-.scp-lb-proposal-item-apply:hover:not(:disabled) {
-    background: rgba(76, 175, 125, 0.25);
-    border-color: var(--scp-success);
-    color: #fff;
-}
-
-.scp-lb-proposal-item-reject {
     background: rgba(255, 92, 92, 0.08);
     border-color: rgba(255, 92, 92, 0.3);
     color: var(--scp-danger);
@@ -780,18 +798,18 @@
 .scp-diff-row:hover { filter: brightness(1.15); }
 .scp-diff-text { flex: 1; white-space: pre-wrap; word-break: break-word; min-width: 0; }
 
-.scp-diff-word-add { 
-    background: rgba(76, 175, 125, 0.45); 
-    border-radius: 2px; 
+.scp-diff-word-add {
+    background: rgba(76, 175, 125, 0.35);
+    border-radius: 2px;
     padding: 1px 2px;
     margin: 0 -1px;
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
 }
 
-.scp-diff-word-rem { 
-    background: rgba(255, 92, 92, 0.5); 
-    border-radius: 2px; 
+.scp-diff-word-rem {
+    background: rgba(255, 92, 92, 0.45);
+    border-radius: 2px;
     padding: 1px 2px;
     margin: 0 -1px;
     box-decoration-break: clone;
@@ -819,14 +837,6 @@
 .scp-diff-split-table td.scp-diff-rem { background: rgba(255,92,92,0.08); color: #f08080; }
 .scp-diff-split-table tr.scp-diff-ctx td { color: var(--scp-text-muted); }
 .scp-diff-split-table tr:hover td { filter: brightness(1.12); }
-.scp-diff-word-add { 
-    background: rgba(76, 175, 125, 0.35); 
-    border-radius: 2px; 
-}
-.scp-diff-word-rem { 
-    background: rgba(255, 92, 92, 0.45); 
-    border-radius: 2px; 
-}
 
 /* ── Diff Modal: mobile centering fix ─────────────────────────
    Overrides the generic full-screen `.scp-modal` mobile rule
