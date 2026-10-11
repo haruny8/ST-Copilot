@@ -322,6 +322,10 @@ function _openExpandedFieldEditor(field, input) {
     let searchOpen = false;
     let editorValue = '';
     let composing = false;
+    let pendingEditorState = null;
+    let compositionEditorState = null;
+    const undoHistory = [];
+    const redoHistory = [];
 
     const syncMobileViewport = () => {
         if (viewportRaf) return;
@@ -401,6 +405,7 @@ function _openExpandedFieldEditor(field, input) {
             end: getOffset(selection.focusNode, selection.focusOffset),
         };
     };
+    const captureEditorState = () => ({ value: editorValue, selection: getSelectionOffsets() });
     const setSelectionOffsets = (start, end = start) => {
         const textNodes = [];
         const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
@@ -499,6 +504,19 @@ function _openExpandedFieldEditor(field, input) {
         editor.replaceChildren(...nodes);
         if (selectionOffsets) setSelectionOffsets(selectionOffsets.start, selectionOffsets.end);
     };
+    const restoreEditorHistory = undo => {
+        const source = undo ? undoHistory : redoHistory;
+        const destination = undo ? redoHistory : undoHistory;
+        if (!source.length) return;
+        destination.push({ value: readEditorText(), selection: getSelectionOffsets() });
+        const state = source.pop();
+        editorValue = state.value;
+        findMatches(searchOpen ? searchInput.value.trim() : '');
+        activeMatch = searchMatches.length ? Math.min(Math.max(activeMatch, 0), searchMatches.length - 1) : -1;
+        renderEditor(state.selection);
+        updateSearchCount();
+        editor.focus({ preventScroll: true });
+    };
     const selectMatch = (matchIndex, keepSearchFocus = false, selectEditorMatch = true) => {
         if (!searchMatches.length) {
             activeMatch = -1;
@@ -546,10 +564,20 @@ function _openExpandedFieldEditor(field, input) {
         selection.removeAllRanges();
         selection.addRange(range);
     };
-    const handleEditorInput = () => {
+    const handleEditorInput = previousState => {
+        previousState ||= pendingEditorState || captureEditorState();
+        pendingEditorState = null;
         const selectionOffsets = getSelectionOffsets();
-        editorValue = readEditorText();
-        if (composing) return;
+        const nextValue = readEditorText();
+        if (composing) {
+            editorValue = nextValue;
+            return;
+        }
+        if (previousState.value !== nextValue) {
+            undoHistory.push(previousState);
+            redoHistory.length = 0;
+        }
+        editorValue = nextValue;
         if (searchOpen) {
             findMatches(searchInput.value.trim());
             activeMatch = searchMatches.length ? 0 : -1;
@@ -603,23 +631,40 @@ function _openExpandedFieldEditor(field, input) {
         selectMatch(activeMatch + direction, true);
     }));
     editor.addEventListener('beforeinput', event => {
+        if (event.inputType === 'historyUndo' || event.inputType === 'historyRedo') {
+            event.preventDefault();
+            restoreEditorHistory(event.inputType === 'historyUndo');
+            return;
+        }
+        pendingEditorState = captureEditorState();
         if (event.inputType === 'insertParagraph' || event.inputType === 'insertLineBreak') {
             event.preventDefault();
+            const previousState = pendingEditorState;
+            pendingEditorState = null;
             insertTextAtSelection('\n');
-            handleEditorInput();
+            handleEditorInput(previousState);
         }
     });
     editor.addEventListener('paste', event => {
         event.preventDefault();
+        const previousState = captureEditorState();
+        pendingEditorState = null;
         insertTextAtSelection((event.clipboardData.getData('text/plain') || '').replace(/\r\n?/g, '\n'));
-        handleEditorInput();
+        handleEditorInput(previousState);
     });
-    editor.addEventListener('compositionstart', () => { composing = true; });
+    editor.addEventListener('compositionstart', () => {
+        compositionEditorState = captureEditorState();
+        pendingEditorState = null;
+        composing = true;
+    });
     editor.addEventListener('compositionend', () => {
         composing = false;
-        handleEditorInput();
+        const previousState = compositionEditorState || captureEditorState();
+        compositionEditorState = null;
+        pendingEditorState = null;
+        handleEditorInput(previousState);
     });
-    editor.addEventListener('input', handleEditorInput);
+    editor.addEventListener('input', () => handleEditorInput());
     applyButton.addEventListener('click', apply);
     overlay.querySelector('.scp-char-field-editor-cancel').addEventListener('click', close);
     closeButton.addEventListener('click', close);
@@ -628,7 +673,12 @@ function _openExpandedFieldEditor(field, input) {
         else { searchInput.focus(); searchInput.select(); }
     });
     overlay.addEventListener('keydown', event => {
-        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
+        const hasShortcutModifier = event.ctrlKey || event.metaKey;
+        const shortcutKey = event.key.toLowerCase();
+        if (hasShortcutModifier && (shortcutKey === 'z' || shortcutKey === 'y')) {
+            event.preventDefault();
+            restoreEditorHistory(shortcutKey === 'z' && !event.shiftKey);
+        } else if (hasShortcutModifier && shortcutKey === 'f') {
             event.preventDefault();
             if (!searchOpen) setSearchOpen(true);
             else { searchInput.focus(); searchInput.select(); }
