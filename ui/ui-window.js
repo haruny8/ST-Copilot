@@ -1627,6 +1627,7 @@ const _PROFILE_KEYS = [
     'includeCharacterCard', 'includeUserPersonality', 'contextDepth', 
     'localHistoryLimit', 'connectionSource', 'connectionProfileId', 'maxTokens',
     'includePlotTrackerContext',
+    'includeSummaryceptionSnippets',
     'applyRegexToContext', 'includeInlineSummaryOriginals', 'reasoningTrimStrings', 'forceStreaming',
     'charEditAIEnabled', 'charEditPrompt', 'lorebookAIManageEnabled',
     'lorebookManagePrompt', 'lorebookAutoKeyword', 'lorebookSTScanDepth',
@@ -1696,6 +1697,7 @@ export function refreshProfilesDropdown() {
             connectionSource: 'default', connectionProfileId: '',
             maxTokens: 8200,
             includePlotTrackerContext: false,
+            includeSummaryceptionSnippets: false,
             applyRegexToContext: true,
             includeInlineSummaryOriginals: false,
         };

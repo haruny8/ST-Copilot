@@ -250,6 +250,14 @@ function buildPlotTrackerContextBlock(settings) {
     }
 }
 
+export function buildSummaryceptionContextBlock(settings) {
+    if (!settings.includeSummaryceptionSnippets) return '';
+    const macro = '{{summaryception_memory}}';
+    const memory = expandMacros(macro);
+    if (!memory || memory === macro) return '';
+    return `<summaryception_snippets>\nThe following are chronological summaries of the roleplay context so far:\n\n${memory}\n</summaryception_snippets>`;
+}
+
 export function _buildAiContextForHistoryMsg(msg) {
     try {
         const lines = msg.swipes?.[msg.swipeIndex || 0]?.historyLines || msg.appliedLines || [];
@@ -281,6 +289,10 @@ export async function assembleMessages(session, settings, pendingUserText, pendi
     const plotTrackerBlock = buildPlotTrackerContextBlock(settings);
     if (plotTrackerBlock) {
         messages.push({ role: 'user', content: plotTrackerBlock });
+    }
+    const summaryceptionBlock = buildSummaryceptionContextBlock(settings);
+    if (summaryceptionBlock) {
+        messages.push({ role: 'user', content: summaryceptionBlock });
     }
     const depth = Math.max(0, parseInt(settings.contextDepth) || 0);
     const hasPicked = !!(session.pickedChatIndices && session.pickedChatIndices.length > 0);
@@ -613,6 +625,8 @@ let label = (LABELS[displayRole] || displayRole) + (idx > 0? ` #${idx}`: '');
 // classify only structural opening tags that begin a line.
 if (displayRole === 'user' && /^<plot_tracker>\r?$/m.test(raw)) {
 label = 'Plot Tracker' + (idx > 0? ` #${idx}`: '');
+} else if (displayRole === 'user' && /^<summaryception_snippets>\r?$/m.test(raw)) {
+label = 'Summaryception Snippets' + (idx > 0? ` #${idx}`: '');
 } else if (displayRole === 'user' && /^<roleplay_context(?:\s[^>]*)?>\r?$/m.test(raw)) {
 const pickedMatch = raw.match(/picked_messages="(\d+)"/);
 const lastMatch = raw.match(/last_messages="(\d+)"/);

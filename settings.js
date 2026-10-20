@@ -40,6 +40,7 @@ export function getSettings() {
         includeCharacterCard: true,
         includeUserPersonality: true,
         includePlotTrackerContext: false,
+        includeSummaryceptionSnippets: false,
         systemPrompt: DEFAULT_SYSTEM_PROMPT,
         profiles: {},
         activeProfile: '',
