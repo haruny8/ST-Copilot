@@ -1065,6 +1065,7 @@ export function syncSPFromSettings() {
     gC('scp-sp-ov-include-sysprompt', eff.includeSystemPrompt);
     gC('scp-sp-ov-include-persona', eff.includeUserPersonality);
     gC('scp-sp-ov-include-plot-tracker', eff.includePlotTrackerContext);
+    gC('scp-sp-ov-include-summaryception', eff.includeSummaryceptionSnippets);
     gC('scp-sp-ov-apply-regex', eff.applyRegexToContext);
     gC('scp-sp-ov-inline-summary-originals', eff.includeInlineSummaryOriginals);
     gC('scp-sp-ov-include-alt-swipes', eff.includeAlternateSwipes);
